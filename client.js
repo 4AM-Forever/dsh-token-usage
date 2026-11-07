@@ -229,6 +229,111 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** Appended to the host-owned panel title; the Host gives the icon slot no trailing seat. */
+    const SIDEBAR_BADGE_CSS = `
+      button[aria-label="Token 用量"]:has(> span[class*="panelTitle"]) > span[class*="panelTitle"]::after,
+      button[aria-label="Token usage"]:has(> span[class*="panelTitle"]) > span[class*="panelTitle"]::after {
+        content: var(--dsh-token-usage-sidebar-today, "");
+        margin-left: 6px;
+        color: var(--dsw-alias-brand-primary);
+        font-size: 10px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0;
+        line-height: 1.4;
+        white-space: nowrap;
+      }
+    `;
+
+    /**
+     * The sidebar glyph plus a compact, highlighted today summary appended to
+     * the host-owned panel label. The row has no trailing slot, so a static
+     * scoped stylesheet reads one root CSS variable that this component updates.
+     * The values come from the same platform account usage as the spend card.
+     * @param props - requested glyph size.
+     * @returns the host-compatible icon.
+     */
+    function SidebarUsageBadge({ size }) {
+      const [summary, setSummary] = React.useState(null);
+      React.useEffect(() => {
+        const controller = new AbortController();
+        let active = true;
+        const load = async () => {
+          const today = toDateInput(new Date());
+          try {
+            const response = await fetch(BILLING_ROUTE, {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: {
+                'content-type': 'application/json',
+                'x-dsh-usage-client': '1'
+              },
+              body: JSON.stringify({
+                action: 'usage',
+                start: today,
+                end: today,
+                tz: -new Date().getTimezoneOffset() * 60
+              }),
+              signal: controller.signal
+            });
+            let payload = null;
+            try {
+              payload = await response.json();
+            } catch (_error) {
+              payload = null;
+            }
+            if (!active || payload === null || typeof payload !== 'object') return;
+            if (payload.ok === true && payload.data?.totals) {
+              const totals = payload.data.totals;
+              const tokens = nonNegative(totals.promptCacheHit)
+                + nonNegative(totals.promptCacheMiss)
+                + nonNegative(totals.completion);
+              setSummary({
+                tokens,
+                cost: nonNegative(totals.cost),
+                currency: typeof payload.data.currency === 'string' ? payload.data.currency : ''
+              });
+              return;
+            }
+            if (payload.code === 'not-signed-in' || payload.code === 'unauthorized') {
+              setSummary(null);
+            }
+          } catch (_error) {
+            // Keep the last known value; the main panel reports the detailed failure.
+          }
+        };
+        load();
+        const timer = window.setInterval(load, 60000);
+        const onVisibility = () => {
+          if (document.visibilityState === 'visible') load();
+        };
+        const onRefresh = () => load();
+        document.addEventListener('visibilitychange', onVisibility);
+        window.addEventListener('dsh-token-usage:refresh', onRefresh);
+        return () => {
+          active = false;
+          window.clearInterval(timer);
+          controller.abort();
+          document.removeEventListener('visibilitychange', onVisibility);
+          window.removeEventListener('dsh-token-usage:refresh', onRefresh);
+        };
+      }, []);
+      React.useEffect(() => {
+        const root = document.documentElement;
+        if (summary === null) {
+          root.style.removeProperty('--dsh-token-usage-sidebar-today');
+          return undefined;
+        }
+        root.style.setProperty('--dsh-token-usage-sidebar-today', JSON.stringify(
+          ` ${formatWan(summary.tokens)} · ${formatCost2(summary.cost, summary.currency)}`
+        ));
+        return () => {
+          root.style.removeProperty('--dsh-token-usage-sidebar-today');
+        };
+      }, [summary]);
+      return h(TokenUsageIcon, { size });
+    }
+
     /**
      * Read one positive session usage row.
      * @param row - Client Session list row.
@@ -575,6 +680,29 @@ window.__ModuleLoader__.load({
       const digits = amount > 0 && amount < 1 ? 4 : 2;
       const suffix = symbol === '' && typeof currency === 'string' && currency !== '' ? ` ${currency}` : '';
       return `${symbol}${amount.toFixed(digits)}${suffix}`;
+    }
+
+    /**
+     * Format a token count in 万 with exactly two decimals.
+     * @param value - token count.
+     * @returns the sidebar label fragment, for example `1.23万`.
+     */
+    function formatWan(value) {
+      const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+      return `${(amount / 10000).toFixed(2)}万`;
+    }
+
+    /**
+     * Format a cost with exactly two decimals for the compact sidebar badge.
+     * @param value - amount in the Platform account currency.
+     * @param currency - Platform currency code.
+     * @returns money text such as `¥4.56`.
+     */
+    function formatCost2(value, currency) {
+      const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+      const symbol = currency === 'CNY' ? '¥' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '';
+      const suffix = symbol === '' && typeof currency === 'string' && currency !== '' ? ` ${currency}` : '';
+      return `${symbol}${amount.toFixed(2)}${suffix}`;
     }
 
     /**
@@ -1682,6 +1810,7 @@ window.__ModuleLoader__.load({
         setRefreshing(true);
         billingRetryRef.current = 0;
         setBillingNonce((value) => value + 1);
+        window.dispatchEvent(new Event('dsh-token-usage:refresh'));
         try {
           const targets = viewRows.slice(0, 40);
           await Promise.allSettled(targets.map((row) =>
@@ -2130,13 +2259,25 @@ window.__ModuleLoader__.load({
       const t = ctx.locale.bind(NS);
       const defaultUnit = ctx.locale.getSnapshot().active.startsWith('zh') ? 'wan' : 'metric';
 
+      ctx.effect(() => {
+        if (typeof document === 'undefined') return undefined;
+        const style = document.createElement('style');
+        style.dataset.plugin = '@local/dsh-token-usage';
+        style.dataset.pluginCss = '@local/dsh-token-usage/sidebar-badge';
+        style.textContent = SIDEBAR_BADGE_CSS;
+        document.head.appendChild(style);
+        return () => {
+          style.remove();
+        };
+      }, 'dsh-token-usage: sidebar badge style');
+
       ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
         name: 'sidebar.panellist',
         id: PANEL_ID,
         order: 5,
         label: () => t('panel.label'),
         locale: NS
-      }, TokenUsageIcon));
+      }, SidebarUsageBadge));
 
       ctx.slots.inject('main', () => ctx.slots.register({
         name: 'main',
