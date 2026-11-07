@@ -84,7 +84,7 @@ window.__ModuleLoader__.load({
       'unit.wan': '万',
       'unit.exact.hint': 'Show exact token counts',
       'unit.metric.hint': 'Show token counts in K, M, and B',
-      'unit.wan.hint': 'Show token counts in 万 and 亿',
+      'unit.wan.hint': 'Show token counts in 万',
       'chart.aria': 'Token distribution',
       'stats.input': 'Uncached input',
       'stats.input.hint': 'Prompt tokens billed without cache',
@@ -173,7 +173,7 @@ window.__ModuleLoader__.load({
       'unit.wan': '万',
       'unit.exact.hint': '显示精确的 Token 数量',
       'unit.metric.hint': '以 K、M、B 为单位显示',
-      'unit.wan.hint': '以万、亿为单位显示',
+      'unit.wan.hint': '以万为单位显示',
       'chart.aria': 'Token 构成',
       'stats.input': '未缓存输入',
       'stats.input.hint': '未命中缓存的提示词 Token',
@@ -607,14 +607,13 @@ window.__ModuleLoader__.load({
     /**
      * Format one token count for a display unit.
      * @param value - token count.
-     * @param unit - `exact`, `metric` (K/M/B), or `wan` (万/亿).
+     * @param unit - `exact`, `metric` (K/M/B), or `wan` (万 only).
      * @returns grouped exact text or one compact unit string.
      */
     function formatTokens(value, unit) {
       if (!Number.isFinite(value) || value <= 0) return '0';
       if (unit === 'exact') return formatNumber(value);
       if (unit === 'wan') {
-        if (value >= 100000000) return compact(value, 100000000, 2, '亿');
         if (value >= 10000) return compact(value, 10000, 1, '万');
         return formatNumber(value);
       }
