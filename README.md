@@ -18,7 +18,7 @@ A DeepSeek Harness Web plugin that adds a **Token usage** entry to the left side
 - **单位切换**：精确、K/M/B、万/亿；选择会保存在浏览器中。
 - **堆叠用量图**：按会话或工作区聚合；前 8 组之外合并为“其他”。
 - **可搜索的会话明细**：缓存、未缓存输入、输出、合计 Token、最近活动。
-- **侧边栏今日摘要**：在“Token 用量”入口文字后显示今日账户 Token 用量（万，两位小数）和今日费用（元，两位小数），使用更小的高亮字体。
+- **侧边栏今日摘要**：在“Token 用量”入口文字后显示今日账户 Token 用量（万/亿，超过千万自动切换为亿，两位小数）和今日费用（元，两位小数），使用更小的高亮绿色字体。
 - **平台账户费用卡片**：显示当前登录的 DeepSeek 平台账户全量费用；金额跟随同一日期筛选，并提供按日/小时的费用趋势。
 - **实时更新与刷新**：本地 Token 跟随 Session 控制流更新；刷新按钮会重新读取投影和账户费用。
 
@@ -28,7 +28,7 @@ A DeepSeek Harness Web plugin that adds a **Token usage** entry to the left side
 
 费用卡片与本地 Token 总量分开统计：Host 读取当前登录的 DeepSeek 平台账户，返回**账户全量计费金额**，可能包含 DSH 之外的调用。费用使用与筛选完全相同的开始/结束日期。平台私有按 Key 用量接口最多接受 30 天，因此界面不会请求更宽的范围。账户未登录或私有接口变化时，费用卡片会显示错误状态，不会伪造估算金额。
 
-侧边栏今日摘要始终使用平台账户的**今天**数据，不跟随主面板的日期筛选；它每 60 秒刷新一次，打开主面板时也可通过刷新按钮立即更新。Token 以万为单位、费用以元为单位，均保留两位小数。摘要只在侧边栏展开时显示；折叠成图标栏时只显示图标。
+侧边栏今日摘要始终使用平台账户的**今天**数据，不跟随主面板的日期筛选；它每 60 秒刷新一次，打开主面板时也可通过刷新按钮立即更新。Token 以万/亿为单位（超过千万自动切换为亿），费用以元为单位，均保留两位小数。摘要只在侧边栏展开时显示；折叠成图标栏时只显示图标。
 
 Fork 会话会继承复制过来的历史，因此本地统计可能重复计入继承部分的用量。
 
@@ -76,7 +76,7 @@ plugin_manager install_bundle <dsh-token-usage 的绝对路径>
 - **Unit switch** for exact counts, K/M/B, or 万/亿. The choice is remembered in the browser.
 - **Stacked usage chart** grouped by session or workspace; groups after the top eight are folded into “Other”.
 - **Searchable session table** with cache, uncached input, output, total tokens, and last activity.
-- **Sidebar today summary**: today's account token usage in 万 and today's spend in yuan, both with two decimals, appended to the “Token usage” entry in a smaller highlighted style.
+- **Sidebar today summary**: today's account token usage in 万 or 亿 (automatically switches to 亿 above ten million) and today's spend in yuan, both with two decimals, appended to the “Token usage” entry in a smaller highlighted green style.
 - **Account-wide spend card** for the signed-in DeepSeek Platform account. The spend amount follows the same date filter and shows a daily/hourly cost trend.
 - **Live updates and refresh**: local token counts follow the Session control stream; the refresh control re-reads projections and account spend.
 
@@ -86,7 +86,7 @@ The local token charts and table read the `tokenUsage` session projection from `
 
 The spend card is separate from the local token totals. It queries the signed-in DeepSeek Platform account through the Host and returns **account-wide billed spend**, which may include calls outside DSH. It uses the exact selected start/end dates. The private platform by-key endpoint accepts at most 30 days, so the UI never requests a wider window. If the account is signed out or the private endpoint changes, the card reports an error instead of showing a fabricated estimate.
 
-The sidebar summary always uses the Platform account's **today** totals and does not follow the main panel's date filter. It refreshes every 60 seconds and also updates immediately when the panel refresh button is used. Token usage is shown in 万 and spend in yuan, both with two decimals. The summary appears when the sidebar is expanded; the collapsed rail shows only the icon.
+The sidebar summary always uses the Platform account's **today** totals and does not follow the main panel's date filter. It refreshes every 60 seconds and also updates immediately when the panel refresh button is used. Token usage is shown in 万 or 亿 (automatically switching to 亿 above ten million), and spend in yuan, both with two decimals. The summary appears when the sidebar is expanded; the collapsed rail shows only the icon.
 
 A forked session inherits copied history, so local totals may include inherited usage more than once.
 

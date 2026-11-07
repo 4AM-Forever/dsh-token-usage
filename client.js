@@ -243,7 +243,7 @@ window.__ModuleLoader__.load({
         margin-left: 6px;
         color: var(--dsh-token-usage-sidebar-highlight) !important;
         -webkit-text-fill-color: var(--dsh-token-usage-sidebar-highlight) !important;
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 600;
         font-variant-numeric: tabular-nums;
         letter-spacing: 0;
@@ -332,7 +332,7 @@ window.__ModuleLoader__.load({
           return undefined;
         }
         root.style.setProperty('--dsh-token-usage-sidebar-today', JSON.stringify(
-          ` ${formatWan(summary.tokens)} · ${formatCost2(summary.cost, summary.currency)}`
+          ` ${formatCompactTokens(summary.tokens)} · ${formatCost2(summary.cost, summary.currency)}`
         ));
         return () => {
           root.style.removeProperty('--dsh-token-usage-sidebar-today');
@@ -690,12 +690,14 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Format a token count in 万 with exactly two decimals.
+     * Format a token count for the compact sidebar: 万 below ten million,
+     * otherwise 亿, always with exactly two decimals.
      * @param value - token count.
-     * @returns the sidebar label fragment, for example `1.23万`.
+     * @returns the sidebar label fragment, for example `1.23万` or `1.23亿`.
      */
-    function formatWan(value) {
+    function formatCompactTokens(value) {
       const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+      if (amount >= 10000000) return `${(amount / 100000000).toFixed(2)}亿`;
       return `${(amount / 10000).toFixed(2)}万`;
     }
 
