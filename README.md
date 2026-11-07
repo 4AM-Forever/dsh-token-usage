@@ -1,38 +1,115 @@
-# DSH Token usage
+# DSH Token Usage
 
-A DeepSeek Harness Web plugin with a left-sidebar entry and a live Token usage panel.
+A DeepSeek Harness Web plugin that adds a **Token usage** entry to the left sidebar: date-filtered local token analytics plus an account-wide DeepSeek Platform spend card.
 
-## What it shows
+[English](#english) | [中文](#中文)
 
-- Total tokens across every session in the current profile, with a cache-hit gauge.
-- Uncached input, output, cache read, and cache write counts.
-- A unit switch for exact counts, K/M/B, and 万/亿; the choice is remembered in the browser.
-- Date filters for today, 7 days, 30 days, and a custom date range (up to 30 days); defaults to today.
-- A stacked usage chart grouped by session or workspace, with the remaining groups folded into “Other”.
-- A searchable per-session breakdown with cache, uncached input, output, totals, and last activity.
-- A refresh control that re-reads the latest usage projections.
-- An account-wide **billed spend** card from the signed-in DeepSeek Platform account, with a daily/hourly trend for the exact selected date range.
+---
 
-The date filter filters **sessions by their last activity time** and shows each matching session's cumulative token totals. DSH's list projection carries whole-session usage rather than per-request timestamps, so the chart deliberately aggregates by session/workspace instead of inventing a daily time series.
+## English
 
-The data comes from the `tokenUsage` session projection supplied by `@deepseek-ai/dsh-token-meter`. The token panel follows the live Session control stream, so counts update as model requests settle; it does not poll or make model/provider calls.
+### Features
 
-The spend card is different: it asks the Host half to read the signed-in DeepSeek Platform session and the platform's private usage/cost endpoints. It is **account-wide** and includes calls outside this profile. The Host returns only aggregated spend rows to the browser; the account token never reaches the Client. The spend request uses the same start/end dates as the filter and is limited to 30 days. If the account is signed out, the card says so instead of showing a fabricated estimate. The private endpoint has no stability guarantee; a failure leaves the card in an error state without affecting the local token charts.
+- **Sidebar entry** with a dedicated Token usage panel.
+- **Date filters** for Today, 7 days, 30 days, and a custom start/end range. Custom ranges are capped at 30 days; the default is Today.
+- **Overview** of total tokens, uncached input, output, cache read, cache write, and cache-hit rate.
+- **Unit switch** for exact counts, K/M/B, or 万/亿. The choice is remembered in the browser.
+- **Stacked usage chart** grouped by session or workspace; groups after the top eight are folded into “Other”.
+- **Searchable session table** with cache, uncached input, output, total tokens, and last activity.
+- **Account-wide spend card** for the signed-in DeepSeek Platform account. The spend amount follows the same date filter and shows a daily/hourly cost trend.
+- **Live updates and refresh**: local token counts follow the Session control stream; the refresh control re-reads projections and account spend.
 
-## Install
+### Data and semantics
 
-The bundle is installed in the active DSH profile with:
+The local token charts and table read the `tokenUsage` session projection from `@deepseek-ai/dsh-token-meter`. The selected dates filter **sessions by last activity time**; each row shows that session's cumulative token totals, not a per-day token split.
 
-```text
-plugin_manager install_bundle @local/dsh-token-usage (absolute package directory)
+The spend card is separate from the local token totals. It queries the signed-in DeepSeek Platform account through the Host and returns **account-wide billed spend**, which may include calls outside DSH. It uses the exact selected start/end dates. The private platform by-key endpoint accepts at most 30 days, so the UI never requests a wider window. If the account is signed out or the private endpoint changes, the card reports an error instead of showing a fabricated estimate.
+
+A forked session inherits copied history, so local totals may include inherited usage more than once.
+
+### Requirements
+
+- DeepSeek Harness Web GUI.
+- A signed-in DeepSeek account for the spend card. The local token panel works without it.
+- The GUI must be opened through `localhost` or `127.0.0.1` for the loopback-only spend bridge.
+
+### Install
+
+```bash
+git clone https://github.com/4AM-Forever/dsh-token-usage.git
 ```
 
-The installed bundle survives restarts. Remove it from the Plugins page or with `plugin_manager remove_bundle`.
+Install the cloned directory as a bundle in the active DSH profile with Plugin Manager, using the absolute package path:
 
-## Notes
+```text
+plugin_manager install_bundle <absolute-path-to-dsh-token-usage>
+```
 
-- This panel reads local DSH session logs for its token charts. The spend card additionally queries `platform.deepseek.com` through the signed-in DSH account; it never asks for or stores a separate platform `userToken` in this plugin.
-- The spend bridge is a loopback-only Host route restricted to local origins and a custom client header. It returns aggregates only, never the account credential.
-- Token counts are provider-reported where the session log records usage, not a billing statement. The spend card is the Platform's billed amount for its own account-wide window.
-- A forked session inherits a copied history, so its usage can overlap with the source session. The panel sums durable session logs and therefore may count that inherited history again.
-- Sessions without a recorded usage sample are omitted from the breakdown and contribute nothing to the totals.
+The package name is `@local/dsh-token-usage`; the sidebar entry and main panel use the id `token-usage`. No build step is required: `client.js` is the browser module and `index.js` is the Host half. Refresh the page after installation.
+
+### Security
+
+- The DeepSeek account token stays in the Host process and is never returned to the Client.
+- The spend bridge is loopback-only, accepts local origins plus a dedicated client header, and returns aggregated spend rows only.
+- The plugin does not store a separate platform `userToken`; it uses the account session already held by DSH.
+
+### Repository tags
+
+`dsh-plugin` · `deepseek-harness` · `dsh` · `dsh-bundle` · `token-usage` · `usage-dashboard` · `cordis-plugin`
+
+Search GitHub for the `dsh-plugin` topic to find this plugin.
+
+---
+
+## 中文
+
+### 功能
+
+- 左侧栏新增 **Token 用量** 入口和独立面板。
+- **日期筛选**：今天、7 天、30 天、指定开始/结束日期。自定义范围最多 30 天，默认查询今天。
+- **总览**：总 Token、未缓存输入、输出、缓存读取、缓存写入和缓存命中率。
+- **单位切换**：精确、K/M/B、万/亿；选择会保存在浏览器中。
+- **堆叠用量图**：按会话或工作区聚合；前 8 组之外合并为“其他”。
+- **可搜索的会话明细**：缓存、未缓存输入、输出、合计 Token、最近活动。
+- **平台账户费用卡片**：显示当前登录的 DeepSeek 平台账户全量费用；金额跟随同一日期筛选，并提供按日/小时的费用趋势。
+- **实时更新与刷新**：本地 Token 跟随 Session 控制流更新；刷新按钮会重新读取投影和账户费用。
+
+### 数据口径
+
+本地 Token 图表和表格读取 `@deepseek-ai/dsh-token-meter` 的 `tokenUsage` 会话投影。日期筛选按**会话最近活动时间**筛选；每行显示该会话的累计 Token，而不是按天拆分后的 Token。
+
+费用卡片与本地 Token 总量分开统计：Host 读取当前登录的 DeepSeek 平台账户，返回**账户全量计费金额**，可能包含 DSH 之外的调用。费用使用与筛选完全相同的开始/结束日期。平台私有按 Key 用量接口最多接受 30 天，因此界面不会请求更宽的范围。账户未登录或私有接口变化时，费用卡片会显示错误状态，不会伪造估算金额。
+
+Fork 会话会继承复制过来的历史，因此本地统计可能重复计入继承部分的用量。
+
+### 环境要求
+
+- DeepSeek Harness Web GUI。
+- 显示费用需要已登录 DeepSeek 账户；本地 Token 面板不依赖账户登录。
+- 费用桥接只接受本机请求，请通过 `localhost` 或 `127.0.0.1` 打开 GUI。
+
+### 安装
+
+```bash
+git clone https://github.com/4AM-Forever/dsh-token-usage.git
+```
+
+在 DSH 的插件管理器中，用绝对包路径把克隆目录安装为当前 profile 的 bundle：
+
+```text
+plugin_manager install_bundle <dsh-token-usage 的绝对路径>
+```
+
+包名是 `@local/dsh-token-usage`，侧栏入口和主面板 id 都是 `token-usage`。无需构建：`client.js` 是浏览器模块，`index.js` 是 Host 半。安装后刷新页面即可。
+
+### 安全说明
+
+- DeepSeek 账户令牌只保留在 Host 进程中，不会返回给前端。
+- 费用桥接只接受本机回环请求、本机来源和专用客户端请求头，只返回聚合费用数据。
+- 插件不单独保存平台 `userToken`，使用 DSH 已持有的账户会话。
+
+### 仓库标签
+
+`dsh-plugin` · `deepseek-harness` · `dsh` · `dsh-bundle` · `token-usage` · `usage-dashboard` · `cordis-plugin`
+
+在 GitHub 搜索 `dsh-plugin` 标签即可找到此插件。
