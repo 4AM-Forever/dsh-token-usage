@@ -231,6 +231,10 @@ window.__ModuleLoader__.load({
 
     /** Appended to the host-owned panel title; the Host gives the icon slot no trailing seat. */
     const SIDEBAR_BADGE_CSS = `
+      button[aria-label="Token 用量"]:has(> span[class*="panelTitle"]) > span[class*="panelTitle"],
+      button[aria-label="Token usage"]:has(> span[class*="panelTitle"]) > span[class*="panelTitle"] {
+        white-space: nowrap;
+      }
       button[aria-label="Token 用量"]:has(> span[class*="panelTitle"]) > span[class*="panelTitle"]::after,
       button[aria-label="Token usage"]:has(> span[class*="panelTitle"]) > span[class*="panelTitle"]::after {
         content: var(--dsh-token-usage-sidebar-today, "");
