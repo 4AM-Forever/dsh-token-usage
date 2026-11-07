@@ -2264,7 +2264,7 @@ window.__ModuleLoader__.load({
       const defaultUnit = ctx.locale.getSnapshot().active.startsWith('zh') ? 'wan' : 'metric';
 
       ctx.effect(() => {
-        if (typeof document === 'undefined') return undefined;
+        if (typeof document === 'undefined' || document.head === null) return undefined;
         const style = document.createElement('style');
         style.dataset.plugin = '@local/dsh-token-usage';
         style.dataset.pluginCss = '@local/dsh-token-usage/sidebar-badge';
