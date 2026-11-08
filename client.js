@@ -614,7 +614,7 @@ window.__ModuleLoader__.load({
       if (!Number.isFinite(value) || value <= 0) return '0';
       if (unit === 'exact') return formatNumber(value);
       if (unit === 'wan') {
-        if (value >= 10000) return compact(value, 10000, 1, '万');
+        if (value >= 10000) return formatWanTokens(value);
         return formatNumber(value);
       }
       if (value >= 1000000000) return compact(value, 1000000000, 2, 'B');
@@ -635,6 +635,20 @@ window.__ModuleLoader__.load({
       const scaled = value / divisor;
       const text = scaled.toFixed(digits).replace(/\.?0+$/, '');
       return `${text}${suffix}`;
+    }
+
+    /**
+     * Format a fixed 万 value, grouping the whole part when it reaches four or
+     * more digits. This keeps values beyond the 亿 boundary readable without
+     * changing the selected unit.
+     * @param value - token count of at least ten thousand.
+     * @returns grouped display text, for example `115,144.8万`.
+     */
+    function formatWanTokens(value) {
+      const text = (value / 10000).toFixed(1).replace(/\.0$/, '');
+      const split = text.split('.');
+      const whole = Number(split[0]).toLocaleString();
+      return `${whole}${split.length > 1 ? `.${split[1]}` : ''}万`;
     }
 
     /**

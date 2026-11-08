@@ -15,7 +15,7 @@ A DeepSeek Harness Web plugin that adds a **Token usage** entry to the left side
 - 左侧栏新增 **Token 用量** 入口和独立面板。
 - **日期筛选**：今天、7 天、30 天、指定开始/结束日期。自定义范围最多 30 天，默认查询今天。
 - **总览**：总 Token、未缓存输入、输出、缓存读取、缓存写入和缓存命中率。
-- **单位切换**：精确、K/M/B、万；选择会保存在浏览器中。主面板的万模式固定显示万，不自动切亿。
+- **单位切换**：精确、K/M/B、万；选择会保存在浏览器中。主面板的万模式固定显示万，不自动切亿；整数部分达到四位时使用千分号，例如 `115,144.8万`。
 - **堆叠用量图**：按会话或工作区聚合；前 8 组之外合并为“其他”。
 - **可搜索的会话明细**：缓存、未缓存输入、输出、合计 Token、最近活动。
 - **侧边栏今日摘要**：在“Token 用量”入口文字后显示今日账户 Token 用量（万/亿，超过千万自动切换为亿，两位小数）和今日费用（元，两位小数），使用更小的高亮绿色字体。
@@ -73,7 +73,7 @@ plugin_manager install_bundle <dsh-token-usage 的绝对路径>
 - **Sidebar entry** with a dedicated Token usage panel.
 - **Date filters** for Today, 7 days, 30 days, and a custom start/end range. Custom ranges are capped at 30 days; the default is Today.
 - **Overview** of total tokens, uncached input, output, cache read, cache write, and cache-hit rate.
-- **Unit switch** for exact counts, K/M/B, or 万. The choice is remembered in the browser. The main panel's 万 mode stays in 万 and never switches to 亿.
+- **Unit switch** for exact counts, K/M/B, or 万. The choice is remembered in the browser. The main panel's 万 mode stays in 万 and never switches to 亿; whole parts of four or more digits use thousands separators, for example `115,144.8万`.
 - **Stacked usage chart** grouped by session or workspace; groups after the top eight are folded into “Other”.
 - **Searchable session table** with cache, uncached input, output, total tokens, and last activity.
 - **Sidebar today summary**: today's account token usage in 万 or 亿 (automatically switches to 亿 above ten million) and today's spend in yuan, both with two decimals, appended to the “Token usage” entry in a smaller highlighted green style.
