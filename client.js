@@ -740,6 +740,18 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** The brand bar-chart mark shown beside the page title. */
+    function BarMark() {
+      return h(
+        'svg',
+        { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': 'true' },
+        h('rect', { x: 3.5, y: 12.5, width: 4, height: 7.5, rx: 2, fill: 'currentColor', opacity: 0.42 }),
+        h('rect', { x: 10, y: 8, width: 4, height: 12, rx: 2, fill: 'currentColor', opacity: 0.68 }),
+        h('rect', { x: 16.5, y: 3.5, width: 4, height: 16.5, rx: 2, fill: 'currentColor' }),
+        h('path', { d: 'M3.5 21.5h17', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', opacity: 0.32 })
+      );
+    }
+
     /**
      * One metric card.
      * @param props - label, exact value, hint, series color, and display unit.
@@ -821,13 +833,29 @@ window.__ModuleLoader__.load({
         max-width: 1000px;
         margin: 0 auto;
         padding: calc(var(--dsh-frame-top-clearance, 0px) + 36px) 32px 56px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr);
+        column-gap: 14px;
       }
+      .dsu-shell > * { grid-column: 1 / -1; }
       .dsu-header {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 24px;
         margin-bottom: 28px;
+      }
+      .dsu-title-wrap { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+      .dsu-mark {
+        width: 44px;
+        height: 44px;
+        flex: none;
+        display: grid;
+        place-items: center;
+        border-radius: 13px;
+        border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, var(--dsw-alias-border-l1));
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, var(--dsw-alias-bg-layer-1));
+        color: var(--dsw-alias-brand-primary);
       }
       .dsu-eyebrow {
         margin-bottom: 8px;
@@ -862,10 +890,10 @@ window.__ModuleLoader__.load({
         display: inline-flex;
         align-items: center;
         gap: 2px;
-        padding: 2px;
+        padding: 3px;
         border: 1px solid var(--dsw-alias-border-l1);
         border-radius: 10px;
-        background: var(--dsw-alias-bg-layer-1);
+        background: var(--dsw-alias-bg-layer-2);
       }
       .dsu-unit-label {
         padding: 0 6px 0 7px;
@@ -875,7 +903,7 @@ window.__ModuleLoader__.load({
         white-space: nowrap;
       }
       .dsu-unit-btn {
-        padding: 4px 8px;
+        padding: 6px 10px;
         border: 0;
         border-radius: 7px;
         background: transparent;
@@ -888,7 +916,7 @@ window.__ModuleLoader__.load({
       }
       @media (hover: hover) {
         .dsu-unit-btn:hover {
-          background: var(--dsw-alias-bg-layer-2);
+          background: var(--dsw-alias-bg-layer-1);
           color: var(--dsw-alias-label-primary);
         }
       }
@@ -898,7 +926,7 @@ window.__ModuleLoader__.load({
       }
       .dsu-unit-btn[aria-pressed="true"] {
         background: var(--dsw-alias-bg-layer-2);
-        box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
+        box-shadow: 0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
         color: var(--dsw-alias-label-primary);
         font-weight: 600;
       }
@@ -949,26 +977,26 @@ window.__ModuleLoader__.load({
         flex-wrap: wrap;
         align-items: center;
         gap: 2px;
-        padding: 2px;
+        padding: 3px;
         border: 1px solid var(--dsw-alias-border-l1);
         border-radius: 10px;
-        background: var(--dsw-alias-bg-layer-1);
+        background: var(--dsw-alias-bg-layer-2);
       }
       .dsu-range-btn {
-        padding: 5px 11px;
+        padding: 7px 12px;
         border: 0;
         border-radius: 7px;
         background: transparent;
         color: var(--dsw-alias-label-secondary);
         cursor: pointer;
         font: inherit;
-        font-size: 12px;
-        line-height: 1.4;
+        font-size: 12.5px;
+        line-height: 1.2;
         white-space: nowrap;
       }
       @media (hover: hover) {
         .dsu-range-btn:hover {
-          background: var(--dsw-alias-bg-layer-2);
+          background: var(--dsw-alias-bg-layer-1);
           color: var(--dsw-alias-label-primary);
         }
       }
@@ -978,7 +1006,7 @@ window.__ModuleLoader__.load({
       }
       .dsu-range-btn[aria-pressed="true"] {
         background: var(--dsw-alias-bg-layer-2);
-        box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
+        box-shadow: 0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
         color: var(--dsw-alias-label-primary);
         font-weight: 600;
       }
@@ -1041,21 +1069,25 @@ window.__ModuleLoader__.load({
       }
       .dsu-hero {
         display: grid;
+        grid-column: 1;
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
         gap: 32px;
-        margin-bottom: 16px;
+        margin-bottom: 28px;
         padding: 26px 28px;
         border: 1px solid var(--dsw-alias-border-l1);
         border-radius: 16px;
-        background: var(--dsw-alias-bg-layer-1);
+        background:
+          radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--dsw-alias-brand-primary) 9%, transparent) 0%, transparent 58%),
+          var(--dsw-alias-bg-layer-1);
       }
       .dsu-hero-main { display: flex; min-width: 0; flex-direction: column; justify-content: center; }
       .dsu-hero-label {
         color: var(--dsw-alias-label-secondary);
-        font-size: 12px;
-        font-weight: 500;
-        letter-spacing: .01em;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .07em;
+        text-transform: uppercase;
       }
       .dsu-hero-value {
         margin: 8px 0 10px;
@@ -1129,9 +1161,10 @@ window.__ModuleLoader__.load({
       }
       .dsu-stats {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-column: 2;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
-        margin-bottom: 34px;
+        margin-bottom: 28px;
       }
       .dsu-stat {
         min-width: 0;
@@ -1163,7 +1196,7 @@ window.__ModuleLoader__.load({
         opacity: .82;
       }
       .dsu-billing {
-        margin-bottom: 16px;
+        margin-bottom: 28px;
         padding: 22px 24px;
         border: 1px solid var(--dsw-alias-border-l1);
         border-radius: 16px;
@@ -1288,7 +1321,7 @@ window.__ModuleLoader__.load({
         outline-offset: 1px;
       }
       .dsu-card {
-        margin-bottom: 34px;
+        margin-bottom: 28px;
         padding: 22px 24px;
         border: 1px solid var(--dsw-alias-border-l1);
         border-radius: 16px;
@@ -1342,7 +1375,7 @@ window.__ModuleLoader__.load({
       }
       .dsu-view-btn[aria-pressed="true"] {
         background: var(--dsw-alias-bg-layer-1);
-        box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
+        box-shadow: 0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
         color: var(--dsw-alias-label-primary);
         font-weight: 600;
       }
@@ -1556,6 +1589,57 @@ window.__ModuleLoader__.load({
         color: var(--dsw-alias-label-secondary);
         font-size: 11.5px;
         line-height: 1.6;
+      }
+      /*
+       * Light theme: bg-base, bg-layer-1 and bg-layer-2 are all the same
+       * white and border-l1 is only 4% black, so the blocks visually merge.
+       * Tint the canvas, firm up the block edges and even out the rhythm;
+       * the dark theme keeps the original alias tokens.
+       */
+      .dsu-page { background: var(--dsw-static-neutral-bluish-55, #f5f7fa); }
+      .dsu-hero,
+      .dsu-stat,
+      .dsu-billing,
+      .dsu-card,
+      .dsu-table {
+        border-color: rgba(15, 17, 21, .1);
+        box-shadow: 0 1px 2px rgba(15, 17, 21, .05);
+      }
+      .dsu-range,
+      .dsu-unit,
+      .dsu-icon-btn,
+      .dsu-live,
+      .dsu-date-input,
+      .dsu-search-input,
+      .dsu-view-toggle { border-color: rgba(15, 17, 21, .12); }
+      .dsu-range,
+      .dsu-unit,
+      .dsu-view-toggle { background: rgba(15, 17, 21, .05); }
+      body[data-ds-dark-theme] .dsu-page { background: var(--dsw-alias-bg-base); }
+      body[data-ds-dark-theme] .dsu-range,
+      body[data-ds-dark-theme] .dsu-unit { background: var(--dsw-alias-bg-layer-1); }
+      body[data-ds-dark-theme] .dsu-range-btn:hover,
+      body[data-ds-dark-theme] .dsu-unit-btn:hover { background: var(--dsw-alias-bg-layer-2); }
+      body[data-ds-dark-theme] .dsu-hero,
+      body[data-ds-dark-theme] .dsu-stat,
+      body[data-ds-dark-theme] .dsu-billing,
+      body[data-ds-dark-theme] .dsu-card,
+      body[data-ds-dark-theme] .dsu-table {
+        border-color: var(--dsw-alias-border-l1);
+        box-shadow: none;
+      }
+      body[data-ds-dark-theme] .dsu-range,
+      body[data-ds-dark-theme] .dsu-unit,
+      body[data-ds-dark-theme] .dsu-icon-btn,
+      body[data-ds-dark-theme] .dsu-live,
+      body[data-ds-dark-theme] .dsu-date-input,
+      body[data-ds-dark-theme] .dsu-search-input,
+      body[data-ds-dark-theme] .dsu-view-toggle { border-color: var(--dsw-alias-border-l1); }
+      @media (max-width: 980px) {
+        .dsu-shell { grid-template-columns: minmax(0, 1fr); }
+        .dsu-hero,
+        .dsu-stats { grid-column: 1 / -1; }
+        .dsu-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       }
       @media (max-width: 860px) {
         .dsu-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1872,10 +1956,13 @@ window.__ModuleLoader__.load({
         h('style', null, CSS),
         h('main', { className: 'dsu-shell' },
           h('header', { className: 'dsu-header' },
-            h('div', null,
-              h('div', { className: 'dsu-eyebrow' }, t('page.eyebrow')),
-              h('h1', { className: 'dsu-title', id: 'dsu-title' }, t('page.title')),
-              h('p', { className: 'dsu-subtitle' }, t('page.subtitle'))
+            h('div', { className: 'dsu-title-wrap' },
+              h('div', { className: 'dsu-mark', 'aria-hidden': 'true' }, h(BarMark)),
+              h('div', null,
+                h('div', { className: 'dsu-eyebrow' }, t('page.eyebrow')),
+                h('h1', { className: 'dsu-title', id: 'dsu-title' }, t('page.title')),
+                h('p', { className: 'dsu-subtitle' }, t('page.subtitle'))
+              )
             ),
             h('div', { className: 'dsu-header-tools' },
               h('div', {
