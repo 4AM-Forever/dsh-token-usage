@@ -72,7 +72,6 @@ window.__ModuleLoader__.load({
       'billing.errorCode': 'Error code',
       'billing.retry': 'Retry',
       'billing.openUsage': 'Open platform usage',
-      'billing.total': 'Account spend',
       'billing.average': 'Average per bucket',
       'billing.peak': 'Peak bucket',
       'billing.averageHour': 'Average per hour',
@@ -80,7 +79,13 @@ window.__ModuleLoader__.load({
       'billing.hourly': 'Hourly',
       'billing.daily': 'Daily',
       'billing.requests': 'Requests',
-      'billing.tipTokens': 'Tokens',
+      'billing.totalTokens': 'Total tokens',
+      'billing.legendHit': 'Cache hit',
+      'billing.legendMiss': 'Cache miss',
+      'billing.legendOut': 'Output',
+      'billing.legendRate': 'Hit rate',
+      'billing.legendCost': 'Spend',
+      'billing.scalePeak': 'Peak',
       'billing.noUsage': 'No billed usage in this range.',
       'unit.label': 'Unit',
       'unit.exact': 'Exact',
@@ -165,7 +170,6 @@ window.__ModuleLoader__.load({
       'billing.errorCode': '错误代码',
       'billing.retry': '重试',
       'billing.openUsage': '打开平台用量页',
-      'billing.total': '账户费用',
       'billing.average': '平均每时段',
       'billing.peak': '峰值时段',
       'billing.averageHour': '平均每小时',
@@ -173,7 +177,13 @@ window.__ModuleLoader__.load({
       'billing.hourly': '按小时',
       'billing.daily': '按日',
       'billing.requests': '请求数',
-      'billing.tipTokens': 'Token 用量',
+      'billing.totalTokens': '总用量',
+      'billing.legendHit': '缓存命中',
+      'billing.legendMiss': '未命中',
+      'billing.legendOut': '输出',
+      'billing.legendRate': '命中率',
+      'billing.legendCost': '消耗金额',
+      'billing.scalePeak': '峰值',
       'billing.noUsage': '该范围内暂无计费用量。',
       'unit.label': '单位',
       'unit.exact': '精确',
@@ -697,6 +707,16 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Format a [0, 1] ratio with two decimals for the hourly readout.
+     * @param value - ratio.
+     * @returns percentage text such as `90.32%`.
+     */
+    function formatRate(value) {
+      if (!Number.isFinite(value) || value <= 0) return '0.00%';
+      return `${(value * 100).toFixed(2)}%`;
+    }
+
+    /**
      * Format one account cost with its currency marker.
      * @param value - amount in the Platform account currency.
      * @param currency - `CNY`, `USD`, `EUR`, or another Platform code.
@@ -1212,9 +1232,10 @@ window.__ModuleLoader__.load({
       }
       .dsu-billing-head {
         display: flex;
-        align-items: flex-start;
+        flex-wrap: wrap;
+        align-items: center;
         justify-content: space-between;
-        gap: 20px;
+        gap: 8px 20px;
         margin-bottom: 12px;
       }
       .dsu-billing-heading {
@@ -1232,8 +1253,29 @@ window.__ModuleLoader__.load({
         font-size: 11.5px;
         line-height: 1.5;
       }
+      .dsu-billing-side {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+      }
+      .dsu-billing-money {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+      }
+      .dsu-billing-amount {
+        overflow-wrap: anywhere;
+        font-size: clamp(20px, 2.6vw, 26px);
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -.02em;
+        line-height: 1.1;
+      }
       .dsu-billing-range {
         flex: none;
+        margin-left: auto;
         padding: 4px 9px;
         border: 1px solid var(--dsw-alias-border-l1);
         border-radius: 999px;
@@ -1247,41 +1289,57 @@ window.__ModuleLoader__.load({
         color: var(--dsw-alias-label-secondary);
         font-size: 12.5px;
       }
-      .dsu-billing-main {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 20px;
-        flex-wrap: wrap;
-      }
-      .dsu-billing-amount {
-        overflow-wrap: anywhere;
-        font-size: clamp(26px, 4vw, 36px);
-        font-weight: 650;
-        font-variant-numeric: tabular-nums;
-        letter-spacing: -.02em;
-        line-height: 1.1;
-      }
-      .dsu-billing-stats { display: flex; flex-wrap: wrap; gap: 24px; }
-      .dsu-billing-stat { display: flex; flex-direction: column; gap: 3px; }
+      .dsu-billing-stats { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+      .dsu-billing-stat { display: inline-flex; align-items: baseline; gap: 5px; }
       .dsu-billing-stat span {
         color: var(--dsw-alias-label-secondary);
-        font-size: 10.5px;
+        font-size: 11px;
         line-height: 1.4;
       }
       .dsu-billing-stat strong {
-        font-size: 13px;
+        font-size: 12.5px;
         font-weight: 600;
         font-variant-numeric: tabular-nums;
         line-height: 1.4;
       }
       .dsu-billing-plot { position: relative; }
-      .dsu-billing-trend {
+      .dsu-billing-legend {
         display: flex;
-        height: 58px;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 16px;
+        margin-top: 14px;
+        color: var(--dsw-alias-label-secondary);
+        font-size: 11px;
+      }
+      .dsu-billing-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .dsu-billing-legend-swatch {
+        width: 9px;
+        height: 9px;
+        flex: none;
+        border-radius: 2px;
+      }
+      .dsu-billing-legend-swatch.is-hit { background: var(--dsw-alias-state-success-primary); }
+      .dsu-billing-legend-swatch.is-miss { background: var(--dsw-alias-brand-primary); }
+      .dsu-billing-legend-swatch.is-out { background: var(--dsw-alias-state-warn-primary); }
+      .dsu-billing-legend-swatch.is-cost { background: var(--dsw-alias-label-secondary); }
+      .dsu-billing-legend-swatch.is-rate {
+        width: 14px;
+        height: 0;
+        border-top: 2px solid var(--dsw-alias-state-business-primary);
+        border-radius: 0;
+      }
+      .dsu-billing-trend {
+        position: relative;
+        display: flex;
+        height: 146px;
         align-items: flex-end;
         gap: 2px;
-        margin-top: 14px;
+        margin-top: 8px;
       }
       .dsu-billing-slot {
         display: flex;
@@ -1297,16 +1355,84 @@ window.__ModuleLoader__.load({
           background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, transparent);
         }
       }
+      .dsu-billing-slot.is-active {
+        background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, transparent);
+      }
       .dsu-billing-bar {
+        display: flex;
         width: 100%;
         min-height: 3px;
-        border-radius: 2px 2px 0 0;
-        background: var(--dsw-alias-brand-primary);
-        opacity: .78;
+        overflow: hidden;
+        flex-direction: column;
+        border-radius: 3px 3px 0 0;
       }
       .dsu-billing-bar.is-idle {
         background: var(--dsw-alias-label-secondary);
         opacity: .16;
+      }
+      .dsu-billing-seg { width: 100%; }
+      .dsu-billing-seg.is-hit { background: var(--dsw-alias-state-success-primary); }
+      .dsu-billing-seg.is-miss { background: var(--dsw-alias-brand-primary); }
+      .dsu-billing-seg.is-out { background: var(--dsw-alias-state-warn-primary); }
+      .dsu-billing-rate {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        pointer-events: none;
+      }
+      .dsu-billing-rate-mid {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        border-top: 1px dashed var(--dsw-alias-border-l2);
+        pointer-events: none;
+      }
+      .dsu-billing-rate-dot {
+        position: absolute;
+        width: 5px;
+        height: 5px;
+        margin: -2.5px 0 0 -2.5px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-business-primary);
+        box-shadow: 0 0 0 1.5px var(--dsw-alias-bg-layer-1);
+        pointer-events: none;
+      }
+      .dsu-billing-scale {
+        position: absolute;
+        top: 3px;
+        padding: 1px 5px;
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: 5px;
+        background: var(--dsw-alias-bg-layer-1);
+        color: var(--dsw-alias-label-secondary);
+        font-size: 10px;
+        line-height: 1.45;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+      .dsu-billing-scale.is-left { left: 3px; }
+      .dsu-billing-scale.is-right {
+        right: 3px;
+        color: var(--dsw-alias-state-business-primary);
+      }
+      .dsu-billing-cost {
+        display: flex;
+        height: 26px;
+        align-items: flex-end;
+        gap: 2px;
+        margin-top: 6px;
+        padding-top: 5px;
+        border-top: 1px solid var(--dsw-alias-border-l1);
+      }
+      .dsu-billing-cost-bar {
+        flex: 1;
+        min-width: 2px;
+        border-radius: 2px 2px 0 0;
+        background: var(--dsw-alias-label-secondary);
+        opacity: .8;
       }
       .dsu-billing-axis {
         display: flex;
@@ -1326,6 +1452,10 @@ window.__ModuleLoader__.load({
         white-space: nowrap;
       }
       .dsu-billing-tick.is-quarter {
+        color: var(--dsw-alias-label-primary);
+        font-weight: 600;
+      }
+      .dsu-billing-tick.is-active {
         color: var(--dsw-alias-label-primary);
         font-weight: 600;
       }
@@ -1739,8 +1869,7 @@ window.__ModuleLoader__.load({
         .dsu-hero { padding: 20px; }
         .dsu-billing { padding: 18px; }
         .dsu-billing-head { flex-direction: column; gap: 10px; }
-        .dsu-billing-main { align-items: flex-start; flex-direction: column; }
-        .dsu-billing-stats { gap: 18px; }
+        .dsu-billing-stats { gap: 4px 18px; }
         .dsu-card { padding: 18px; }
         .dsu-card-head { flex-direction: column; gap: 12px; }
         .dsu-view-toggle { align-self: flex-start; }
@@ -2014,10 +2143,14 @@ window.__ModuleLoader__.load({
           });
         })()
         : billingItems;
+      const billingTokenTotal = (item) => (item.promptCacheHit ?? 0)
+        + (item.promptCacheMiss ?? 0)
+        + (item.completion ?? 0);
       const billingPeak = billingSeries.reduce((peak, item) =>
         item.cost > peak.cost ? item : peak, { cost: 0, time: '' });
       const billingAverage = billingSeries.length > 0 ? billingData.totals.cost / billingSeries.length : 0;
-      const billingTrendMax = Math.max(...billingSeries.map((item) => item.cost), 0.0001);
+      const billingMaxCost = Math.max(...billingSeries.map((item) => item.cost), 0.0001);
+      const billingMaxTotal = Math.max(...billingSeries.map(billingTokenTotal), 0.0001);
       const billingTickStep = Math.max(1, Math.ceil(billingSeries.length / 6));
       const billingTicks = billingSeries.map((item, index) => {
         if (billingIsHourly) {
@@ -2029,17 +2162,47 @@ window.__ModuleLoader__.load({
       });
       const billingRangeLabel = selectedDateLabel;
       const billingTipItem = billingTip === null ? null : billingSeries[billingTip.index] ?? null;
-      const billingTipTokens = billingTipItem === null
-        ? 0
-        : (billingTipItem.promptCacheHit ?? 0)
-          + (billingTipItem.promptCacheMiss ?? 0)
-          + (billingTipItem.completion ?? 0);
+      const billingTipTokens = billingTipItem === null ? 0 : billingTokenTotal(billingTipItem);
+      const billingTipRate = billingTipItem === null
+        ? null
+        : (() => {
+          const hit = billingTipItem.promptCacheHit ?? 0;
+          const denom = hit + (billingTipItem.promptCacheMiss ?? 0);
+          return denom > 0 ? hit / denom : null;
+        })();
       const billingTipLeft = billingTip === null
         ? 0
         : Math.min(92, Math.max(8, ((billingTip.index + 0.5) / Math.max(1, billingSeries.length)) * 100));
       const billingTickQuarter = billingTicks.map((tick, index) => billingIsHourly
         ? (billingSeries.length === 24 ? Number(tick) % 6 === 0 : index % 6 === 0)
         : (index === 0 || index === billingSeries.length - 1));
+      /*
+       * Hit-rate polyline: buckets without any prompt tokens are skipped so the
+       * line breaks instead of pretending a 0% rate for an empty hour. Adjacent
+       * marks form one segment; a lone mark still gets a dot.
+       */
+      const billingRateMarks = [];
+      billingSeries.forEach((item, index) => {
+        const hit = item.promptCacheHit ?? 0;
+        const denom = hit + (item.promptCacheMiss ?? 0);
+        if (denom <= 0) return;
+        billingRateMarks.push({
+          index,
+          x: ((index + 0.5) / Math.max(1, billingSeries.length)) * 100,
+          y: (1 - hit / denom) * 100
+        });
+      });
+      const billingRateSegments = [];
+      let billingRateRun = [];
+      for (const mark of billingRateMarks) {
+        if (billingRateRun.length > 0
+          && mark.index !== billingRateRun[billingRateRun.length - 1].index + 1) {
+          if (billingRateRun.length >= 2) billingRateSegments.push(billingRateRun);
+          billingRateRun = [];
+        }
+        billingRateRun.push(mark);
+      }
+      if (billingRateRun.length >= 2) billingRateSegments.push(billingRateRun);
       const emptyFiltered = data.rows.length > 0 && viewRows.length === 0;
       const emptyForQuery = emptyFiltered && normalizedQuery !== '';
       const refresh = async () => {
@@ -2261,13 +2424,40 @@ window.__ModuleLoader__.load({
                 h('h2', { className: 'dsu-billing-title', id: 'dsu-billing-title' }, t('billing.title')),
                 h('p', { className: 'dsu-billing-sub' }, t('billing.subtitle'))
               ),
-              billingRangeLabel !== ''
-                ? h('span', { className: 'dsu-billing-range' },
-                  billingData === null
-                    ? billingRangeLabel
-                    : `${billingRangeLabel} · ${billingIsHourly ? t('billing.hourly') : t('billing.daily')}`
-                )
-                : null
+              h('div', { className: 'dsu-billing-side' },
+                billing.status === 'ready' && billingData !== null
+                  ? h('div', { className: 'dsu-billing-money' },
+                    h('div', { className: 'dsu-billing-amount' },
+                      formatMoney(billingData.totals.cost, billingData.currency)
+                    ),
+                    h('div', { className: 'dsu-billing-stats' },
+                      h('div', { className: 'dsu-billing-stat' },
+                        h('span', null, billingIsHourly ? t('billing.averageHour') : t('billing.average')),
+                        h('strong', null, formatMoney(billingAverage, billingData.currency))
+                      ),
+                      h('div', { className: 'dsu-billing-stat' },
+                        h('span', null, billingIsHourly ? t('billing.peakHour') : t('billing.peak')),
+                        h('strong', null,
+                          billingPeak.cost > 0
+                            ? `${billingIsHourly ? `${String(billingPeak.time).slice(11, 16)} · ` : ''}${formatMoney(billingPeak.cost, billingData.currency)}`
+                            : '—'
+                        )
+                      ),
+                      h('div', { className: 'dsu-billing-stat' },
+                        h('span', null, t('billing.requests')),
+                        h('strong', null, formatNumber(billingData.totals.requests))
+                      )
+                    )
+                  )
+                  : null,
+                billingRangeLabel !== ''
+                  ? h('span', { className: 'dsu-billing-range' },
+                    billingData === null
+                      ? billingRangeLabel
+                      : `${billingRangeLabel} · ${billingIsHourly ? t('billing.hourly') : t('billing.daily')}`
+                  )
+                  : null
+              )
             ),
             billing.status === 'idle' || billing.status === 'loading'
               ? h('div', { className: 'dsu-billing-loading', role: 'status' }, t('billing.loading'))
@@ -2291,75 +2481,140 @@ window.__ModuleLoader__.load({
                 )
                 : billing.status === 'ready' && billingData !== null
                   ? h('div', null,
-                    h('div', { className: 'dsu-billing-main' },
-                      h('div', { className: 'dsu-billing-amount' },
-                        formatMoney(billingData.totals.cost, billingData.currency)
-                      ),
-                      h('div', { className: 'dsu-billing-stats' },
-                        h('div', { className: 'dsu-billing-stat' },
-                          h('span', null, billingIsHourly ? t('billing.averageHour') : t('billing.average')),
-                          h('strong', null, formatMoney(billingAverage, billingData.currency))
-                        ),
-                        h('div', { className: 'dsu-billing-stat' },
-                          h('span', null, billingIsHourly ? t('billing.peakHour') : t('billing.peak')),
-                          h('strong', null,
-                            billingPeak.cost > 0
-                              ? `${billingIsHourly ? `${String(billingPeak.time).slice(11, 16)} · ` : ''}${formatMoney(billingPeak.cost, billingData.currency)}`
-                              : '—'
-                          )
-                        ),
-                        h('div', { className: 'dsu-billing-stat' },
-                          h('span', null, t('billing.requests')),
-                          h('strong', null, formatNumber(billingData.totals.requests))
-                        )
-                      )
-                    ),
                     billingSeries.length > 0
-                      ? h('div', {
-                        className: 'dsu-billing-plot',
-                        onMouseLeave: () => setBillingTip(null)
-                      },
-                        h('div', { className: 'dsu-billing-trend', 'aria-hidden': 'true' },
-                          billingSeries.map((item, index) => h('div', {
-                            key: item.time,
-                            className: 'dsu-billing-slot',
-                            onMouseEnter: () => setBillingTip({ index })
+                      ? h('div', null,
+                        h('div', { className: 'dsu-billing-legend', 'aria-hidden': 'true' },
+                          [
+                            ['is-hit', 'billing.legendHit'],
+                            ['is-miss', 'billing.legendMiss'],
+                            ['is-out', 'billing.legendOut'],
+                            ['is-rate', 'billing.legendRate'],
+                            ['is-cost', 'billing.legendCost']
+                          ].map(([kind, key]) => h('span', {
+                            key: kind,
+                            className: 'dsu-billing-legend-item'
                           },
-                            h('div', {
-                              className: `dsu-billing-bar${item.cost > 0 ? '' : ' is-idle'}`,
-                              style: { height: `${Math.max(3, (item.cost / billingTrendMax) * 100)}%` }
-                            })
+                            h('span', { className: `dsu-billing-legend-swatch ${kind}`, 'aria-hidden': 'true' }),
+                            t(key)
                           ))
                         ),
-                        h('div', { className: 'dsu-billing-axis', 'aria-hidden': 'true' },
-                          billingTicks.map((tick, index) => h('span', {
-                            key: String(index),
-                            className: `dsu-billing-tick${billingTickQuarter[index] ? ' is-quarter' : ''}`
-                          }, tick))
-                        ),
-                        billingTipItem !== null
-                          ? h('div', {
-                            className: 'dsu-billing-tip',
-                            role: 'tooltip',
-                            style: { left: `${billingTipLeft}%` }
-                          },
-                            h('div', { className: 'dsu-billing-tip-time' }, billingTipItem.time),
-                            h('div', { className: 'dsu-billing-tip-row' },
-                              h('span', null, t('billing.total')),
-                              h('strong', null, formatMoney(billingTipItem.cost, billingData.currency))
+                        h('div', {
+                          className: 'dsu-billing-plot',
+                          onMouseLeave: () => setBillingTip(null)
+                        },
+                          h('div', { className: 'dsu-billing-trend', 'aria-hidden': 'true' },
+                            billingSeries.map((item, index) => {
+                              const hit = item.promptCacheHit ?? 0;
+                              const miss = item.promptCacheMiss ?? 0;
+                              const out = item.completion ?? 0;
+                              const totalTokens = hit + miss + out;
+                              return h('div', {
+                                key: item.time,
+                                className: `dsu-billing-slot${billingTip !== null && billingTip.index === index ? ' is-active' : ''}`,
+                                onMouseEnter: () => setBillingTip({ index })
+                              },
+                                h('div', {
+                                  className: `dsu-billing-bar${totalTokens > 0 ? '' : ' is-idle'}`,
+                                  style: { height: `${(totalTokens / billingMaxTotal) * 100}%` }
+                                },
+                                  totalTokens > 0
+                                    ? [
+                                      h('div', {
+                                        key: 'out',
+                                        className: 'dsu-billing-seg is-out',
+                                        style: { height: `${(out / totalTokens) * 100}%` }
+                                      }),
+                                      h('div', {
+                                        key: 'miss',
+                                        className: 'dsu-billing-seg is-miss',
+                                        style: { height: `${(miss / totalTokens) * 100}%` }
+                                      }),
+                                      h('div', {
+                                        key: 'hit',
+                                        className: 'dsu-billing-seg is-hit',
+                                        style: { height: `${(hit / totalTokens) * 100}%` }
+                                      })
+                                    ]
+                                    : null
+                                )
+                              );
+                            }),
+                            h('div', { className: 'dsu-billing-rate-mid', 'aria-hidden': 'true' }),
+                            billingRateSegments.map((segment, segmentIndex) => h('svg', {
+                              key: `rate-${segmentIndex}`,
+                              className: 'dsu-billing-rate',
+                              viewBox: '0 0 100 100',
+                              preserveAspectRatio: 'none',
+                              'aria-hidden': 'true'
+                            },
+                              h('polyline', {
+                                points: segment.map((mark) => `${mark.x},${mark.y}`).join(' '),
+                                fill: 'none',
+                                stroke: 'var(--dsw-alias-state-business-primary)',
+                                strokeWidth: 1.5,
+                                strokeLinecap: 'round',
+                                strokeLinejoin: 'round',
+                                vectorEffect: 'non-scaling-stroke'
+                              })
+                            )),
+                            billingRateMarks.map((mark) => h('div', {
+                              key: `rate-dot-${mark.index}`,
+                              className: 'dsu-billing-rate-dot',
+                              style: { left: `${mark.x}%`, top: `${mark.y}%` }
+                            })),
+                            h('span', { className: 'dsu-billing-scale is-left', 'aria-hidden': 'true' },
+                              `${t('billing.scalePeak')} ${formatTokens(billingMaxTotal, unit)}`
                             ),
-                            h('div', { className: 'dsu-billing-tip-row' },
-                              h('span', null, t('billing.requests')),
-                              h('strong', null, formatNumber(billingTipItem.requests ?? 0))
-                            ),
-                            billingTipTokens > 0
-                              ? h('div', { className: 'dsu-billing-tip-row' },
-                                h('span', null, t('billing.tipTokens')),
-                                h('strong', null, formatNumber(billingTipTokens))
+                            h('span', { className: 'dsu-billing-scale is-right', 'aria-hidden': 'true' }, '100%')
+                          ),
+                          h('div', { className: 'dsu-billing-cost', 'aria-hidden': 'true' },
+                            billingSeries.map((item, index) => h('div', {
+                              key: item.time,
+                              className: `dsu-billing-slot${billingTip !== null && billingTip.index === index ? ' is-active' : ''}`,
+                              onMouseEnter: () => setBillingTip({ index })
+                            },
+                              h('div', {
+                                className: 'dsu-billing-cost-bar',
+                                style: { height: `${(item.cost / billingMaxCost) * 100}%` }
+                              })
+                            ))
+                          ),
+                          h('div', { className: 'dsu-billing-axis', 'aria-hidden': 'true' },
+                            billingTicks.map((tick, index) => h('span', {
+                              key: String(index),
+                              className: `dsu-billing-tick${billingTickQuarter[index] ? ' is-quarter' : ''}${billingTip !== null && billingTip.index === index ? ' is-active' : ''}`
+                            }, tick))
+                          ),
+                          billingTipItem !== null
+                            ? h('div', {
+                              className: 'dsu-billing-tip',
+                              role: 'tooltip',
+                              style: { left: `${billingTipLeft}%` }
+                            },
+                              h('div', { className: 'dsu-billing-tip-time' }, billingTipItem.time),
+                              h('div', { className: 'dsu-billing-tip-row' },
+                                h('span', null, t('billing.totalTokens')),
+                                h('strong', null, formatTokens(billingTipTokens, unit))
+                              ),
+                              h('div', { className: 'dsu-billing-tip-row' },
+                                h('span', null, t('billing.legendHit')),
+                                h('strong', null, formatTokens(billingTipItem.promptCacheHit ?? 0, unit))
+                              ),
+                              h('div', { className: 'dsu-billing-tip-row' },
+                                h('span', null, t('billing.legendMiss')),
+                                h('strong', null, formatTokens(billingTipItem.promptCacheMiss ?? 0, unit))
+                              ),
+                              h('div', { className: 'dsu-billing-tip-row' },
+                                h('span', null, t('billing.legendRate')),
+                                h('strong', null, billingTipRate === null ? '—' : formatRate(billingTipRate))
+                              ),
+                              h('div', { className: 'dsu-billing-tip-row' },
+                                h('span', null, t('billing.legendCost')),
+                                h('strong', null, formatMoney(billingTipItem.cost, billingData.currency))
                               )
-                              : null
-                          )
-                          : null
+                            )
+                            : null
+                        )
                       )
                       : null,
                     billingSeries.length === 0
