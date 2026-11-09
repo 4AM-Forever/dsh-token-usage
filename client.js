@@ -62,7 +62,7 @@ window.__ModuleLoader__.load({
       'chart.note': 'Top 8 groups; smaller groups are combined into Other.',
       'workspace.none': 'Ungrouped',
       'billing.title': 'Platform account spend',
-      'billing.subtitle': 'Account-wide billed DeepSeek usage, including calls outside this profile.',
+      'billing.subtitle': 'Account-wide, including calls outside this profile.',
       'billing.loading': 'Loading account spend…',
       'billing.notSignedIn': 'DeepSeek account not connected',
       'billing.notSignedInBody': 'Sign in to the DeepSeek account in Settings to show account-wide billed spend.',
@@ -73,7 +73,6 @@ window.__ModuleLoader__.load({
       'billing.retry': 'Retry',
       'billing.openUsage': 'Open platform usage',
       'billing.total': 'Account spend',
-      'billing.accountScope': 'Account-wide',
       'billing.average': 'Average per bucket',
       'billing.peak': 'Peak bucket',
       'billing.averageHour': 'Average per hour',
@@ -156,7 +155,7 @@ window.__ModuleLoader__.load({
       'chart.note': '显示前 8 组，其余合并为“其他”。',
       'workspace.none': '未分组',
       'billing.title': '平台账户费用',
-      'billing.subtitle': '账户全量的 DeepSeek 计费用量，包含 DSH 之外的调用。',
+      'billing.subtitle': '账户全量，包含 DSH 之外的调用。',
       'billing.loading': '正在读取账户费用…',
       'billing.notSignedIn': '未连接 DeepSeek 账户',
       'billing.notSignedInBody': '请在设置中登录 DeepSeek 账户，以显示账户全量费用。',
@@ -167,7 +166,6 @@ window.__ModuleLoader__.load({
       'billing.retry': '重试',
       'billing.openUsage': '打开平台用量页',
       'billing.total': '账户费用',
-      'billing.accountScope': '账户全量',
       'billing.average': '平均每时段',
       'billing.peak': '峰值时段',
       'billing.averageHour': '平均每小时',
@@ -1217,9 +1215,16 @@ window.__ModuleLoader__.load({
         align-items: flex-start;
         justify-content: space-between;
         gap: 20px;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
       }
-      .dsu-billing-title { margin: 0 0 5px; font-size: 15px; font-weight: 600; }
+      .dsu-billing-heading {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 10px;
+      }
+      .dsu-billing-title { margin: 0; font-size: 15px; font-weight: 600; }
       .dsu-billing-sub {
         max-width: 650px;
         margin: 0;
@@ -1249,21 +1254,13 @@ window.__ModuleLoader__.load({
         gap: 20px;
         flex-wrap: wrap;
       }
-      .dsu-billing-label { color: var(--dsw-alias-label-secondary); font-size: 11.5px; }
       .dsu-billing-amount {
-        margin-top: 4px;
         overflow-wrap: anywhere;
         font-size: clamp(26px, 4vw, 36px);
         font-weight: 650;
         font-variant-numeric: tabular-nums;
         letter-spacing: -.02em;
         line-height: 1.1;
-      }
-      .dsu-billing-meta {
-        margin-top: 5px;
-        color: var(--dsw-alias-label-secondary);
-        font-size: 11.5px;
-        line-height: 1.4;
       }
       .dsu-billing-stats { display: flex; flex-wrap: wrap; gap: 24px; }
       .dsu-billing-stat { display: flex; flex-direction: column; gap: 3px; }
@@ -2260,7 +2257,7 @@ window.__ModuleLoader__.load({
           ),
           h('section', { className: 'dsu-billing', 'aria-labelledby': 'dsu-billing-title' },
             h('div', { className: 'dsu-billing-head' },
-              h('div', null,
+              h('div', { className: 'dsu-billing-heading' },
                 h('h2', { className: 'dsu-billing-title', id: 'dsu-billing-title' }, t('billing.title')),
                 h('p', { className: 'dsu-billing-sub' }, t('billing.subtitle'))
               ),
@@ -2295,14 +2292,8 @@ window.__ModuleLoader__.load({
                 : billing.status === 'ready' && billingData !== null
                   ? h('div', null,
                     h('div', { className: 'dsu-billing-main' },
-                      h('div', null,
-                        h('div', { className: 'dsu-billing-label' }, t('billing.total')),
-                        h('div', { className: 'dsu-billing-amount' },
-                          formatMoney(billingData.totals.cost, billingData.currency)
-                        ),
-                        h('div', { className: 'dsu-billing-meta' },
-                          t('billing.accountScope')
-                        )
+                      h('div', { className: 'dsu-billing-amount' },
+                        formatMoney(billingData.totals.cost, billingData.currency)
                       ),
                       h('div', { className: 'dsu-billing-stats' },
                         h('div', { className: 'dsu-billing-stat' },
