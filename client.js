@@ -1388,7 +1388,7 @@ window.__ModuleLoader__.load({
       }
       .dsu-billing-bar {
         display: flex;
-        width: 100%;
+        width: 60%;
         min-height: 3px;
         overflow: hidden;
         flex-direction: column;
@@ -1463,7 +1463,8 @@ window.__ModuleLoader__.load({
        * the dark theme, and a white fill inside the plot reads as a break.
        */
       .dsu-billing-cost-bar {
-        flex: 1;
+        flex: none;
+        width: 60%;
         min-width: 2px;
         border-radius: 2px 2px 0 0;
         background: var(--dsw-alias-state-error-primary);
