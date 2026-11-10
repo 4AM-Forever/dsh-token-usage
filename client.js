@@ -282,61 +282,171 @@ window.__ModuleLoader__.load({
       }
     `;
 
+    /** How long one account-usage response may be reused between the two halves. */
+    const USAGE_TTL_MS = 45000;
+
+    /**
+     * One account-usage window shared by the sidebar badge and the panel.
+     * Whichever half fetches first serves the other, and every committed
+     * response republishes the sidebar figure, so the badge and the
+     * "Tokens used" stat cannot drift apart.
+     */
+    const usageStore = { entries: new Map(), waiters: new Map(), listeners: new Set() };
+
+    /**
+     * Subscribe to committed account-usage responses.
+     * @param listener - called after every successful fetch.
+     * @returns the unsubscribe function.
+     */
+    function subscribeUsage(listener) {
+      usageStore.listeners.add(listener);
+      return () => usageStore.listeners.delete(listener);
+    }
+
+    /**
+     * Build the cache key for one local calendar window.
+     * @param start - `YYYY-MM-DD`.
+     * @param end - `YYYY-MM-DD`.
+     * @returns the key, including the browser's UTC offset.
+     */
+    function usageKey(start, end) {
+      return `${start}|${end}|${-new Date().getTimezoneOffset() * 60}`;
+    }
+
+    /**
+     * Publish today's account figure to the host-owned sidebar label. Both
+     * halves reach this through fetchUsage, so a fetch from either one
+     * refreshes the badge.
+     * @param start - requested window start.
+     * @param end - requested window end.
+     * @param payload - the route response just committed.
+     */
+    function publishSidebarToday(start, end, payload) {
+      const day = toDateInput(new Date());
+      if (start !== day || end !== day) return;
+      const root = document.documentElement;
+      if (payload !== null && typeof payload === 'object' && payload.ok === true
+        && payload.data?.totals !== undefined) {
+        const totals = payload.data.totals;
+        const tokens = nonNegative(totals.promptCacheHit)
+          + nonNegative(totals.promptCacheMiss)
+          + nonNegative(totals.completion);
+        root.style.setProperty('--dsh-token-usage-sidebar-today', JSON.stringify(
+          ` ${formatCompactTokens(tokens)} · ${formatCost2(nonNegative(totals.cost), typeof payload.data.currency === 'string' ? payload.data.currency : '')}`
+        ));
+        return;
+      }
+      if (payload !== null && typeof payload === 'object'
+        && (payload.code === 'not-signed-in' || payload.code === 'unauthorized')) {
+        root.style.removeProperty('--dsh-token-usage-sidebar-today');
+      }
+    }
+
+    /**
+     * Map one route response onto the panel's billing state.
+     * @param payload - the route response.
+     * @returns the state record the panel renders from.
+     */
+    function billingStateFrom(payload) {
+      if (payload !== null && typeof payload === 'object' && payload.ok === true
+        && payload.data !== null && typeof payload.data === 'object') {
+        return {
+          status: 'ready',
+          data: payload.data,
+          code: null,
+          usageUrl: typeof payload.usageUrl === 'string' ? payload.usageUrl : null
+        };
+      }
+      const code = payload !== null && typeof payload === 'object' && typeof payload.code === 'string'
+        ? payload.code
+        : 'internal';
+      return {
+        status: code === 'not-signed-in' ? 'signed-out' : 'error',
+        data: null,
+        code,
+        usageUrl: payload !== null && typeof payload.usageUrl === 'string' ? payload.usageUrl : null
+      };
+    }
+
+    /**
+     * Fetch one account-usage window, deduplicating concurrent callers and
+     * reusing a response younger than USAGE_TTL_MS.
+     * @param start - `YYYY-MM-DD`.
+     * @param end - `YYYY-MM-DD`.
+     * @returns the route payload.
+     */
+    async function fetchUsage(start, end) {
+      const key = usageKey(start, end);
+      const cached = usageStore.entries.get(key);
+      if (cached !== undefined && Date.now() - cached.at < USAGE_TTL_MS) {
+        publishSidebarToday(start, end, cached.payload);
+        return cached.payload;
+      }
+      const pending = usageStore.waiters.get(key);
+      if (pending !== undefined) return pending;
+      const request = (async () => {
+        const response = await fetch(BILLING_ROUTE, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json', 'x-dsh-usage-client': '1' },
+          body: JSON.stringify({
+            action: 'usage',
+            start,
+            end,
+            tz: -new Date().getTimezoneOffset() * 60
+          })
+        });
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch (_error) {
+          payload = null;
+        }
+        usageStore.waiters.delete(key);
+        if (payload === null || typeof payload !== 'object') throw new Error('usage-response');
+        usageStore.entries.set(key, { at: Date.now(), payload });
+        publishSidebarToday(start, end, payload);
+        usageStore.listeners.forEach((listener) => {
+          try {
+            listener();
+          } catch (_error) {
+            // One failing listener must not stop the others.
+          }
+        });
+        return payload;
+      })().catch((error) => {
+        usageStore.waiters.delete(key);
+        throw error;
+      });
+      usageStore.waiters.set(key, request);
+      return request;
+    }
+
     /**
      * The sidebar glyph plus a compact, highlighted today summary appended to
      * the host-owned panel label. The row has no trailing slot, so a static
-     * scoped stylesheet reads one root CSS variable that this component updates.
-     * The values come from the same platform account usage as the spend card.
+     * scoped stylesheet reads one root CSS variable that the shared usage
+     * fetch publishes above.
      * @param props - requested glyph size.
      * @returns the host-compatible icon.
      */
     function SidebarUsageBadge({ size }) {
-      const [summary, setSummary] = React.useState(null);
       React.useEffect(() => {
-        const controller = new AbortController();
         let active = true;
+        let retryTimer;
+        let attempts = 0;
         const load = async () => {
-          const today = toDateInput(new Date());
+          const day = toDateInput(new Date());
           try {
-            const response = await fetch(BILLING_ROUTE, {
-              method: 'POST',
-              credentials: 'same-origin',
-              headers: {
-                'content-type': 'application/json',
-                'x-dsh-usage-client': '1'
-              },
-              body: JSON.stringify({
-                action: 'usage',
-                start: today,
-                end: today,
-                tz: -new Date().getTimezoneOffset() * 60
-              }),
-              signal: controller.signal
-            });
-            let payload = null;
-            try {
-              payload = await response.json();
-            } catch (_error) {
-              payload = null;
-            }
-            if (!active || payload === null || typeof payload !== 'object') return;
-            if (payload.ok === true && payload.data?.totals) {
-              const totals = payload.data.totals;
-              const tokens = nonNegative(totals.promptCacheHit)
-                + nonNegative(totals.promptCacheMiss)
-                + nonNegative(totals.completion);
-              setSummary({
-                tokens,
-                cost: nonNegative(totals.cost),
-                currency: typeof payload.data.currency === 'string' ? payload.data.currency : ''
-              });
-              return;
-            }
-            if (payload.code === 'not-signed-in' || payload.code === 'unauthorized') {
-              setSummary(null);
-            }
+            await fetchUsage(day, day);
+            attempts = 0;
           } catch (_error) {
-            // Keep the last known value; the main panel reports the detailed failure.
+            // Come back sooner than the minute-long interval so one failed
+            // poll cannot freeze the badge at an older figure.
+            if (!active) return;
+            attempts += 1;
+            window.clearTimeout(retryTimer);
+            retryTimer = window.setTimeout(load, Math.min(15000 * attempts, 60000));
           }
         };
         load();
@@ -349,25 +459,12 @@ window.__ModuleLoader__.load({
         window.addEventListener('dsh-token-usage:refresh', onRefresh);
         return () => {
           active = false;
+          window.clearTimeout(retryTimer);
           window.clearInterval(timer);
-          controller.abort();
           document.removeEventListener('visibilitychange', onVisibility);
           window.removeEventListener('dsh-token-usage:refresh', onRefresh);
         };
       }, []);
-      React.useEffect(() => {
-        const root = document.documentElement;
-        if (summary === null) {
-          root.style.removeProperty('--dsh-token-usage-sidebar-today');
-          return undefined;
-        }
-        root.style.setProperty('--dsh-token-usage-sidebar-today', JSON.stringify(
-          ` ${formatCompactTokens(summary.tokens)} · ${formatCost2(summary.cost, summary.currency)}`
-        ));
-        return () => {
-          root.style.removeProperty('--dsh-token-usage-sidebar-today');
-        };
-      }, [summary]);
       return h(TokenUsageIcon, { size });
     }
 
@@ -2002,9 +2099,23 @@ window.__ModuleLoader__.load({
       const customMaxDay = addLocalDays(customStartDay, MAX_RANGE_DAYS - 1);
       const customEndMax = toDateInput(customMaxDay > todayDay ? todayDay : customMaxDay);
       React.useEffect(() => {
-        const controller = new AbortController();
         let active = true;
         let retryTimer;
+        const rangeKey = usageKey(selectedStartDate, selectedEndDate);
+        const adopt = () => {
+          if (!active) return;
+          const entry = usageStore.entries.get(rangeKey);
+          if (entry === undefined) return;
+          const next = billingStateFrom(entry.payload);
+          /*
+           * A transient Platform failure keeps the badge's figure on screen,
+           * so the panel holds its last figure too; only an auth failure, which
+           * clears the badge, may take the panel back to its signed-out state.
+           */
+          const holdsLastFigure = next.status === 'error'
+            && next.code !== 'not-signed-in' && next.code !== 'unauthorized';
+          setBilling((current) => (current.status === 'ready' && holdsLastFigure ? current : next));
+        };
         const scheduleRetry = () => {
           if (!active || billingRetryRef.current >= 2) return;
           billingRetryRef.current += 1;
@@ -2013,61 +2124,37 @@ window.__ModuleLoader__.load({
           }, 1500);
         };
         setBillingTip(null);
-        setBilling({ status: 'loading', data: null, code: null, usageUrl: null });
-        fetch(BILLING_ROUTE, {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'content-type': 'application/json',
-            'x-dsh-usage-client': '1'
-          },
-          body: JSON.stringify({
-            action: 'usage',
-            start: selectedStartDate,
-            end: selectedEndDate,
-            tz: -new Date().getTimezoneOffset() * 60
-          }),
-          signal: controller.signal
-        }).then(async (response) => {
-          let payload = null;
-          try {
-            payload = await response.json();
-          } catch (_error) {
-            payload = null;
-          }
-          if (payload === null || typeof payload !== 'object') {
-            throw new Error('billing route failed');
-          }
-          return payload;
-        }).then((payload) => {
-          if (!active) return;
-          if (payload.ok === true && payload.data !== null && typeof payload.data === 'object') {
-            billingRetryRef.current = 0;
-            setBilling({
-              status: 'ready',
-              data: payload.data,
-              code: null,
-              usageUrl: typeof payload.usageUrl === 'string' ? payload.usageUrl : null
+        const cached = usageStore.entries.get(rangeKey);
+        const usable = cached !== undefined && cached.payload?.ok === true
+          && Date.now() - cached.at < USAGE_TTL_MS;
+        if (usable) {
+          billingRetryRef.current = 0;
+          setBilling(billingStateFrom(cached.payload));
+        } else {
+          setBilling({ status: 'loading', data: null, code: null, usageUrl: null });
+          fetchUsage(selectedStartDate, selectedEndDate)
+            .then((payload) => {
+              if (!active) return;
+              if (payload.ok === true && payload.data !== null && typeof payload.data === 'object') {
+                billingRetryRef.current = 0;
+                setBilling(billingStateFrom(payload));
+                return;
+              }
+              const code = typeof payload.code === 'string' ? payload.code : 'internal';
+              setBilling(billingStateFrom(payload));
+              if (code !== 'not-signed-in' && code !== 'unauthorized') scheduleRetry();
+            })
+            .catch(() => {
+              if (!active) return;
+              setBilling({ status: 'error', data: null, code: 'network', usageUrl: null });
+              scheduleRetry();
             });
-            return;
-          }
-          const code = typeof payload.code === 'string' ? payload.code : 'internal';
-          setBilling({
-            status: code === 'not-signed-in' ? 'signed-out' : 'error',
-            data: null,
-            code,
-            usageUrl: typeof payload.usageUrl === 'string' ? payload.usageUrl : null
-          });
-          if (code !== 'not-signed-in' && code !== 'unauthorized') scheduleRetry();
-        }).catch((error) => {
-          if (!active || error?.name === 'AbortError') return;
-          setBilling({ status: 'error', data: null, code: 'network', usageUrl: null });
-          scheduleRetry();
-        });
+        }
+        const unsubscribe = subscribeUsage(adopt);
         return () => {
           active = false;
           clearTimeout(retryTimer);
-          controller.abort();
+          unsubscribe();
         };
       }, [selectedStartDate, selectedEndDate, billingNonce]);
       const list = props.useSessions(SELECT_ALL);
