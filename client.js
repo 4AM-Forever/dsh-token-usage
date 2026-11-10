@@ -2102,26 +2102,50 @@ window.__ModuleLoader__.load({
         let active = true;
         let retryTimer;
         const rangeKey = usageKey(selectedStartDate, selectedEndDate);
-        const adopt = () => {
-          if (!active) return;
-          const entry = usageStore.entries.get(rangeKey);
-          if (entry === undefined) return;
-          const next = billingStateFrom(entry.payload);
-          /*
-           * A transient Platform failure keeps the badge's figure on screen,
-           * so the panel holds its last figure too; only an auth failure, which
-           * clears the badge, may take the panel back to its signed-out state.
-           */
-          const holdsLastFigure = next.status === 'error'
-            && next.code !== 'not-signed-in' && next.code !== 'unauthorized';
-          setBilling((current) => (current.status === 'ready' && holdsLastFigure ? current : next));
-        };
         const scheduleRetry = () => {
           if (!active || billingRetryRef.current >= 2) return;
           billingRetryRef.current += 1;
           retryTimer = setTimeout(() => {
             if (active) setBillingNonce((value) => value + 1);
           }, 1500);
+        };
+        // Mirrors publishSidebarToday: a transient failure keeps the last figure
+        // on both halves, while an auth failure clears both.
+        const holdsLastFigure = (next) => next.status === 'error'
+          && next.code !== 'not-signed-in' && next.code !== 'unauthorized';
+        const apply = (payload, initial) => {
+          if (!active) return;
+          if (payload.ok === true && payload.data !== null && typeof payload.data === 'object') {
+            billingRetryRef.current = 0;
+            setBilling(billingStateFrom(payload));
+            return;
+          }
+          const next = billingStateFrom(payload);
+          if (!initial) {
+            // A background poll must not blank a working panel while the badge
+            // keeps its figure on screen.
+            setBilling((current) => (current.status === 'ready' && holdsLastFigure(next) ? current : next));
+            return;
+          }
+          setBilling(next);
+          if (next.code !== 'not-signed-in' && next.code !== 'unauthorized') scheduleRetry();
+        };
+        const adopt = () => {
+          if (!active) return;
+          const entry = usageStore.entries.get(rangeKey);
+          if (entry === undefined) return;
+          const next = billingStateFrom(entry.payload);
+          setBilling((current) => (current.status === 'ready' && holdsLastFigure(next) ? current : next));
+        };
+        const pull = (initial) => {
+          if (initial) setBilling({ status: 'loading', data: null, code: null, usageUrl: null });
+          fetchUsage(selectedStartDate, selectedEndDate)
+            .then((payload) => apply(payload, initial))
+            .catch(() => {
+              if (!active || !initial) return;
+              setBilling({ status: 'error', data: null, code: 'network', usageUrl: null });
+              scheduleRetry();
+            });
         };
         setBillingTip(null);
         const cached = usageStore.entries.get(rangeKey);
@@ -2131,29 +2155,18 @@ window.__ModuleLoader__.load({
           billingRetryRef.current = 0;
           setBilling(billingStateFrom(cached.payload));
         } else {
-          setBilling({ status: 'loading', data: null, code: null, usageUrl: null });
-          fetchUsage(selectedStartDate, selectedEndDate)
-            .then((payload) => {
-              if (!active) return;
-              if (payload.ok === true && payload.data !== null && typeof payload.data === 'object') {
-                billingRetryRef.current = 0;
-                setBilling(billingStateFrom(payload));
-                return;
-              }
-              const code = typeof payload.code === 'string' ? payload.code : 'internal';
-              setBilling(billingStateFrom(payload));
-              if (code !== 'not-signed-in' && code !== 'unauthorized') scheduleRetry();
-            })
-            .catch(() => {
-              if (!active) return;
-              setBilling({ status: 'error', data: null, code: 'network', usageUrl: null });
-              scheduleRetry();
-            });
+          pull(true);
         }
         const unsubscribe = subscribeUsage(adopt);
+        // The badge polls on its own; polling here keeps the panel fresh even
+        // if that half lives in another document or loses its subscription.
+        const poll = window.setInterval(() => {
+          if (active) pull(false);
+        }, 60000);
         return () => {
           active = false;
           clearTimeout(retryTimer);
+          window.clearInterval(poll);
           unsubscribe();
         };
       }, [selectedStartDate, selectedEndDate, billingNonce]);
