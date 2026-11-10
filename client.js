@@ -1326,7 +1326,7 @@ window.__ModuleLoader__.load({
       .dsu-billing-legend-swatch.is-hit { background: var(--dsw-alias-state-success-primary); }
       .dsu-billing-legend-swatch.is-miss { background: var(--dsw-alias-state-business-primary); }
       .dsu-billing-legend-swatch.is-out { background: var(--dsw-alias-state-warn-primary); }
-      .dsu-billing-legend-swatch.is-cost { background: var(--dsw-alias-brand-primary); }
+      .dsu-billing-legend-swatch.is-cost { background: var(--dsw-alias-state-error-primary); }
       .dsu-billing-legend-swatch.is-rate {
         width: 14px;
         height: 0;
@@ -1424,11 +1424,15 @@ window.__ModuleLoader__.load({
         padding-top: 5px;
         border-top: 1px solid var(--dsw-alias-border-l1);
       }
+      /*
+       * Spend bars take the error red: brand-primary flips to near-white in
+       * the dark theme, and a white fill inside the plot reads as a break.
+       */
       .dsu-billing-cost-bar {
         flex: 1;
         min-width: 2px;
         border-radius: 2px 2px 0 0;
-        background: var(--dsw-alias-brand-primary);
+        background: var(--dsw-alias-state-error-primary);
       }
       .dsu-billing-axis {
         display: flex;
@@ -2082,7 +2086,7 @@ window.__ModuleLoader__.load({
       const loading = data.rows.length === 0 && data.phase === 'pending';
       const visibleRows = viewRows.slice(0, SESSION_LIMIT);
       const segments = [
-        { key: 'input', label: t('stats.input'), value: total.uncachedInputTokens, color: 'var(--dsw-alias-brand-primary)' },
+        { key: 'input', label: t('stats.input'), value: total.uncachedInputTokens, color: 'var(--dsw-alias-state-business-primary)' },
         { key: 'output', label: t('stats.output'), value: total.outputTokens, color: 'var(--dsw-alias-state-warn-primary)' },
         { key: 'cacheRead', label: t('stats.cacheRead'), value: total.cacheReadTokens, color: 'var(--dsw-alias-state-success-primary)' },
         { key: 'cacheWrite', label: t('stats.cacheWrite'), value: total.cacheWriteTokens, color: 'var(--dsw-alias-state-idle-primary)' }
@@ -2389,7 +2393,7 @@ window.__ModuleLoader__.load({
               label: t('stats.input'),
               value: total.uncachedInputTokens,
               hint: t('stats.input.hint'),
-              color: 'var(--dsw-alias-brand-primary)',
+              color: 'var(--dsw-alias-state-business-primary)',
               unit
             }),
             h(StatCard, {
