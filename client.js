@@ -79,6 +79,7 @@ window.__ModuleLoader__.load({
       'billing.hourly': 'Hourly',
       'billing.daily': 'Daily',
       'billing.requests': 'Requests',
+      'billing.rangeTokens': 'Tokens used',
       'billing.totalTokens': 'Total tokens',
       'billing.legendHit': 'Cache hit',
       'billing.legendMiss': 'Cache miss',
@@ -182,6 +183,7 @@ window.__ModuleLoader__.load({
       'billing.hourly': '按小时',
       'billing.daily': '按日',
       'billing.requests': '请求数',
+      'billing.rangeTokens': '消耗 Token',
       'billing.totalTokens': '总用量',
       'billing.legendHit': '缓存命中',
       'billing.legendMiss': '未命中',
@@ -2188,6 +2190,16 @@ window.__ModuleLoader__.load({
       const billingPeak = billingSeries.reduce((peak, item) =>
         item.cost > peak.cost ? item : peak, { cost: 0, time: '' });
       const billingAverage = billingSeries.length > 0 ? billingData.totals.cost / billingSeries.length : 0;
+      /*
+       * The Platform's own token total for the selected range: the exact
+       * figure the sidebar badge reports for today, so the account's real
+       * consumption can be read beside the local session totals above.
+       */
+      const billingPlatformTokens = billingData === null || billingData.totals === undefined
+        ? 0
+        : nonNegative(billingData.totals.promptCacheHit)
+          + nonNegative(billingData.totals.promptCacheMiss)
+          + nonNegative(billingData.totals.completion);
       const billingMaxCost = Math.max(...billingSeries.map((item) => item.cost), 0.0001);
       const billingMaxTotal = Math.max(...billingSeries.map(billingTokenTotal), 0.0001);
       const billingAvgTop = Math.min(100, Math.max(0, (1 - billingAverage / billingMaxCost) * 100));
@@ -2480,6 +2492,10 @@ window.__ModuleLoader__.load({
                       formatMoney(billingData.totals.cost, billingData.currency)
                     ),
                     h('div', { className: 'dsu-billing-stats' },
+                      h('div', { className: 'dsu-billing-stat' },
+                        h('span', null, t('billing.rangeTokens')),
+                        h('strong', null, formatTokens(billingPlatformTokens, unit))
+                      ),
                       h('div', { className: 'dsu-billing-stat' },
                         h('span', null, billingIsHourly ? t('billing.averageHour') : t('billing.average')),
                         h('strong', null, formatMoney(billingAverage, billingData.currency))
