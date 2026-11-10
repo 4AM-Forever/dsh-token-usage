@@ -1324,13 +1324,13 @@ window.__ModuleLoader__.load({
         border-radius: 2px;
       }
       .dsu-billing-legend-swatch.is-hit { background: var(--dsw-alias-state-success-primary); }
-      .dsu-billing-legend-swatch.is-miss { background: var(--dsw-alias-brand-primary); }
+      .dsu-billing-legend-swatch.is-miss { background: var(--dsw-alias-state-business-primary); }
       .dsu-billing-legend-swatch.is-out { background: var(--dsw-alias-state-warn-primary); }
-      .dsu-billing-legend-swatch.is-cost { background: var(--dsw-alias-label-secondary); }
+      .dsu-billing-legend-swatch.is-cost { background: var(--dsw-alias-brand-primary); }
       .dsu-billing-legend-swatch.is-rate {
         width: 14px;
         height: 0;
-        border-top: 2px solid var(--dsw-alias-state-business-primary);
+        border-top: 2px solid var(--dsw-alias-label-secondary);
         border-radius: 0;
       }
       .dsu-billing-trend {
@@ -1372,7 +1372,7 @@ window.__ModuleLoader__.load({
       }
       .dsu-billing-seg { width: 100%; }
       .dsu-billing-seg.is-hit { background: var(--dsw-alias-state-success-primary); }
-      .dsu-billing-seg.is-miss { background: var(--dsw-alias-brand-primary); }
+      .dsu-billing-seg.is-miss { background: var(--dsw-alias-state-business-primary); }
       .dsu-billing-seg.is-out { background: var(--dsw-alias-state-warn-primary); }
       .dsu-billing-rate {
         position: absolute;
@@ -1396,7 +1396,7 @@ window.__ModuleLoader__.load({
         height: 5px;
         margin: -2.5px 0 0 -2.5px;
         border-radius: 50%;
-        background: var(--dsw-alias-state-business-primary);
+        background: var(--dsw-alias-label-secondary);
         box-shadow: 0 0 0 1.5px var(--dsw-alias-bg-layer-1);
         pointer-events: none;
       }
@@ -1414,10 +1414,7 @@ window.__ModuleLoader__.load({
         pointer-events: none;
       }
       .dsu-billing-scale.is-left { left: 3px; }
-      .dsu-billing-scale.is-right {
-        right: 3px;
-        color: var(--dsw-alias-state-business-primary);
-      }
+      .dsu-billing-scale.is-right { right: 3px; }
       .dsu-billing-cost {
         display: flex;
         height: 26px;
@@ -1431,8 +1428,7 @@ window.__ModuleLoader__.load({
         flex: 1;
         min-width: 2px;
         border-radius: 2px 2px 0 0;
-        background: var(--dsw-alias-label-secondary);
-        opacity: .8;
+        background: var(--dsw-alias-brand-primary);
       }
       .dsu-billing-axis {
         display: flex;
@@ -2550,7 +2546,7 @@ window.__ModuleLoader__.load({
                               h('polyline', {
                                 points: segment.map((mark) => `${mark.x},${mark.y}`).join(' '),
                                 fill: 'none',
-                                stroke: 'var(--dsw-alias-state-business-primary)',
+                                stroke: 'var(--dsw-alias-label-secondary)',
                                 strokeWidth: 1.5,
                                 strokeLinecap: 'round',
                                 strokeLinejoin: 'round',
