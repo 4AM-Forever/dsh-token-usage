@@ -53,7 +53,7 @@ window.__ModuleLoader__.load({
       'range.maxDays': 'Up to 30 days',
       'range.note': 'Filters sessions by last activity within the selected dates; token counts are session totals. Defaults to today.',
       'chart.title': 'Usage distribution',
-      'chart.subtitle': 'Stacked token composition · {mode}.',
+      'chart.subtitle': 'Local session totals · {mode}.',
       'chart.empty': 'No usage in this view',
       'chart.groupBy': 'Group by',
       'chart.session': 'By session',
@@ -79,7 +79,6 @@ window.__ModuleLoader__.load({
       'billing.hourly': 'Hourly',
       'billing.daily': 'Daily',
       'billing.requests': 'Requests',
-      'billing.rangeTokens': 'Tokens used',
       'billing.totalTokens': 'Total tokens',
       'billing.legendHit': 'Cache hit',
       'billing.legendMiss': 'Cache miss',
@@ -109,6 +108,8 @@ window.__ModuleLoader__.load({
       'stats.cacheRead.hint': 'Prompt tokens served from cache',
       'stats.cacheWrite': 'Cache write',
       'stats.cacheWrite.hint': 'Prompt tokens written to cache',
+      'stats.cacheWrite.platformHint': 'The Platform does not report cache writes',
+      'hero.accountMeta': 'Account-wide billed usage, including calls outside this profile',
       'list.title': 'Session breakdown',
       'list.count': 'Sessions in view: {n}',
       'list.session': 'Session',
@@ -157,7 +158,7 @@ window.__ModuleLoader__.load({
       'range.maxDays': '最多 30 天',
       'range.note': '按所选日期筛选会话最近活动时间；Token 为会话累计值。默认今天。',
       'chart.title': '用量分布',
-      'chart.subtitle': 'Token 构成 · {mode}。',
+      'chart.subtitle': '本地会话累计 · {mode}。',
       'chart.empty': '当前视图暂无用量',
       'chart.groupBy': '分组方式',
       'chart.session': '按会话',
@@ -183,7 +184,6 @@ window.__ModuleLoader__.load({
       'billing.hourly': '按小时',
       'billing.daily': '按日',
       'billing.requests': '请求数',
-      'billing.rangeTokens': '消耗 Token',
       'billing.totalTokens': '总用量',
       'billing.legendHit': '缓存命中',
       'billing.legendMiss': '未命中',
@@ -213,6 +213,8 @@ window.__ModuleLoader__.load({
       'stats.cacheRead.hint': '从缓存读取的提示词 Token',
       'stats.cacheWrite': '缓存写入',
       'stats.cacheWrite.hint': '写入缓存的提示词 Token',
+      'stats.cacheWrite.platformHint': '平台不统计缓存写入',
+      'hero.accountMeta': '账户全量计费用量，包含 DSH 之外的调用',
       'list.title': '会话明细',
       'list.count': '当前显示会话：{n}',
       'list.session': '会话',
@@ -895,12 +897,14 @@ window.__ModuleLoader__.load({
      * @returns the card element.
      */
     function StatCard({ label, value, hint, color, unit }) {
+      const pending = value === null || value === undefined;
       return h('div', { className: 'dsu-stat' },
         h('div', { className: 'dsu-stat-head' },
           h('span', { className: 'dsu-dot', style: { background: color }, 'aria-hidden': 'true' }),
           h('span', null, label)
         ),
-        h('div', { className: 'dsu-stat-value', title: formatNumber(value) }, formatTokens(value, unit)),
+        h('div', { className: 'dsu-stat-value', title: pending ? '' : formatNumber(value) },
+          pending ? '—' : formatTokens(value, unit)),
         h('div', { className: 'dsu-stat-hint' }, hint)
       );
     }
@@ -2250,7 +2254,6 @@ window.__ModuleLoader__.load({
       const chartSubtitle = t('chart.subtitle', {
         mode: chartMode === 'workspace' ? t('chart.workspace') : t('chart.session')
       });
-      const gaugeAngle = `${aggregate.cacheHit * 360}deg`;
       const billingData = billing.data;
       const billingItems = Array.isArray(billingData?.items) ? billingData.items : [];
       /*
@@ -2300,6 +2303,38 @@ window.__ModuleLoader__.load({
         : nonNegative(billingData.totals.promptCacheHit)
           + nonNegative(billingData.totals.promptCacheMiss)
           + nonNegative(billingData.totals.completion);
+      /*
+       * The header reads the Platform's own numbers whenever they are
+       * available, because the sidebar badge shows exactly that figure. The
+       * local session projection stays as the fallback for a signed-out
+       * profile, where the Platform half cannot answer at all.
+       */
+      const accountTotalsReady = billing.status === 'ready'
+        && billingData !== null && billingData.totals !== undefined;
+      const panelTotals = accountTotalsReady
+        ? {
+          total: billingPlatformTokens,
+          uncachedInputTokens: nonNegative(billingData.totals.promptCacheMiss),
+          outputTokens: nonNegative(billingData.totals.completion),
+          cacheReadTokens: nonNegative(billingData.totals.promptCacheHit),
+          cacheWriteTokens: 0
+        }
+        : total;
+      const panelHitRate = accountTotalsReady
+        ? (() => {
+          const hit = nonNegative(billingData.totals.promptCacheHit);
+          const miss = nonNegative(billingData.totals.promptCacheMiss);
+          return hit + miss > 0 ? hit / (hit + miss) : 0;
+        })()
+        : aggregate.cacheHit;
+      /*
+       * Account figures arrive a moment after the panel opens. Until they do,
+       * the header shows a dash rather than the local lifetime figure, so it
+       * never displays a number the sidebar would contradict.
+       */
+      const panelPending = !accountTotalsReady
+        && (billing.status === 'idle' || billing.status === 'loading');
+      const gaugeAngle = `${(panelPending ? 0 : panelHitRate) * 360}deg`;
       const billingMaxCost = Math.max(...billingSeries.map((item) => item.cost), 0.0001);
       const billingMaxTotal = Math.max(...billingSeries.map(billingTokenTotal), 0.0001);
       const billingAvgTop = Math.min(100, Math.max(0, (1 - billingAverage / billingMaxCost) * 100));
@@ -2526,12 +2561,16 @@ window.__ModuleLoader__.load({
               h('div', { className: 'dsu-hero-label' }, t('hero.total')),
               h('div', {
                 className: 'dsu-hero-value',
-                title: formatNumber(total.total)
-              }, formatTokens(total.total, unit)),
+                title: panelPending ? '' : formatNumber(panelTotals.total)
+              }, panelPending ? '—' : formatTokens(panelTotals.total, unit)),
               h('div', { className: 'dsu-hero-meta' },
-                viewRows.length > 0
-                  ? t('hero.meta', { sessions: viewRows.length })
-                  : data.rows.length > 0 ? t('chart.empty') : t('hero.empty')
+                panelPending
+                  ? t('billing.loading')
+                  : accountTotalsReady
+                    ? t('hero.accountMeta')
+                    : viewRows.length > 0
+                      ? t('hero.meta', { sessions: viewRows.length })
+                      : data.rows.length > 0 ? t('chart.empty') : t('hero.empty')
               )
             ),
             h('div', { className: 'dsu-hero-side' },
@@ -2539,10 +2578,11 @@ window.__ModuleLoader__.load({
                 className: 'dsu-gauge',
                 style: { '--dsu-gauge-angle': gaugeAngle },
                 role: 'img',
-                'aria-label': `${t('hero.cacheHit')}: ${formatPercent(aggregate.cacheHit)}`
+                'aria-label': `${t('hero.cacheHit')}: ${formatPercent(panelHitRate)}`
               },
                 h('div', { className: 'dsu-gauge-inner' },
-                  h('div', { className: 'dsu-gauge-value' }, formatPercent(aggregate.cacheHit)),
+                  h('div', { className: 'dsu-gauge-value' },
+                    panelPending ? '—' : formatPercent(panelHitRate)),
                   h('div', { className: 'dsu-gauge-label' }, t('hero.cacheHit'))
                 )
               ),
@@ -2552,29 +2592,29 @@ window.__ModuleLoader__.load({
           h('section', { className: 'dsu-stats', 'aria-label': t('page.title') },
             h(StatCard, {
               label: t('stats.input'),
-              value: total.uncachedInputTokens,
+              value: panelPending ? null : panelTotals.uncachedInputTokens,
               hint: t('stats.input.hint'),
               color: 'var(--dsw-alias-state-business-primary)',
               unit
             }),
             h(StatCard, {
               label: t('stats.output'),
-              value: total.outputTokens,
+              value: panelPending ? null : panelTotals.outputTokens,
               hint: t('stats.output.hint'),
               color: 'var(--dsw-alias-state-warn-primary)',
               unit
             }),
             h(StatCard, {
               label: t('stats.cacheRead'),
-              value: total.cacheReadTokens,
+              value: panelPending ? null : panelTotals.cacheReadTokens,
               hint: t('stats.cacheRead.hint'),
               color: 'var(--dsw-alias-state-success-primary)',
               unit
             }),
             h(StatCard, {
               label: t('stats.cacheWrite'),
-              value: total.cacheWriteTokens,
-              hint: t('stats.cacheWrite.hint'),
+              value: panelPending ? null : panelTotals.cacheWriteTokens,
+              hint: accountTotalsReady ? t('stats.cacheWrite.platformHint') : t('stats.cacheWrite.hint'),
               color: 'var(--dsw-alias-state-idle-primary)',
               unit
             })
@@ -2592,10 +2632,6 @@ window.__ModuleLoader__.load({
                       formatMoney(billingData.totals.cost, billingData.currency)
                     ),
                     h('div', { className: 'dsu-billing-stats' },
-                      h('div', { className: 'dsu-billing-stat' },
-                        h('span', null, t('billing.rangeTokens')),
-                        h('strong', null, formatTokens(billingPlatformTokens, unit))
-                      ),
                       h('div', { className: 'dsu-billing-stat' },
                         h('span', null, billingIsHourly ? t('billing.averageHour') : t('billing.average')),
                         h('strong', null, formatMoney(billingAverage, billingData.currency))
