@@ -3265,7 +3265,7 @@ const WHALE_CORNER_CSS = `
     font-variant-numeric: tabular-nums;
     letter-spacing: -.03em;
     line-height: 1.1;
-    text-align: right;
+    text-align: left;
     white-space: nowrap;
   }
   .dsu-whale-hero-value.is-negative {
@@ -3279,7 +3279,7 @@ const WHALE_CORNER_CSS = `
     font-size: 11.5px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-    text-align: right;
+    text-align: left;
     white-space: nowrap;
   }
   .dsu-whale-value.is-pending {
