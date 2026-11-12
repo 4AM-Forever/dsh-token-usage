@@ -3241,7 +3241,7 @@ const WHALE_CORNER_CSS = `
     grid-template-columns: max-content max-content;
     justify-content: center;
     align-items: baseline;
-    column-gap: 10px;
+    column-gap: 5px;
     row-gap: 3px;
   }
   .dsu-whale-divider {
