@@ -3719,7 +3719,7 @@ function WhaleCorner(props) {
         h('span', { className: 'dsu-whale-label' }, t('whale.todayCost')),
         h('span', {
           className: `dsu-whale-value${today === null ? ' is-pending' : ''}`
-        }, today === null ? '—' : formatTokens(today.tokens, 'wan')),
+        }, today === null ? '—' : formatTokens(today.tokens, 'metric')),
         h('span', { className: 'dsu-whale-label' }, t('whale.todayTokens'))
       )
     )
