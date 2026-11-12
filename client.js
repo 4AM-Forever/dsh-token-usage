@@ -3204,13 +3204,18 @@ const WHALE_CORNER_CSS = `
     -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent 99%);
     mask-image: linear-gradient(to bottom, #000 82%, transparent 99%);
   }
-  /* Bare glyph: no plate behind it, just the mark itself. */
+  /* The glyph sits on the bubble's outline. Its backdrop is the bubble's own
+     colour, so the border reads as broken around the mark rather than being
+     drawn through it. */
   .dsu-whale-q {
     position: absolute;
-    left: -7px;
-    top: -13px;
+    left: -13px;
+    top: -8px;
+    padding: 0 3px;
+    border-radius: 6px;
+    background: var(--dsw-alias-bg-layer-1);
     color: #3b82f6;
-    font: 700 22px/1 Georgia, "Times New Roman", serif;
+    font: 700 30px/1 Georgia, "Times New Roman", serif;
     text-shadow: 0 1px 5px rgba(15, 17, 21, .45);
     pointer-events: none;
     user-select: none;
