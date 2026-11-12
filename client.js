@@ -3537,9 +3537,13 @@ function useComposerBounds() {
     let frame = 0;
     let lastKey = '';
 
+    const findComposer = () => document.querySelector(
+      '[data-composer-card], [data-composer], [contenteditable="true"], textarea'
+    );
+
     const measure = () => {
       frame = 0;
-      const element = document.querySelector('[data-composer-card]');
+      const element = findComposer();
       if (element === null) {
         if (lastKey !== '') {
           lastKey = '';
@@ -3550,11 +3554,19 @@ function useComposerBounds() {
       const rect = element.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
       const right = Math.round(rect.right);
+      const top = Math.round(rect.top);
       const offset = Math.round(window.innerHeight - rect.bottom);
-      const key = `${right}:${offset}:${Math.round(window.innerWidth)}`;
+      const key = `${right}:${offset}:${top}:${Math.round(window.innerWidth)}`;
       if (key === lastKey) return;
       lastKey = key;
-      setBounds({ right, offset, viewport: window.innerWidth });
+      setBounds({
+        right,
+        top,
+        offset,
+        height: Math.round(rect.height),
+        viewport: window.innerWidth,
+        viewportHeight: window.innerHeight
+      });
     };
 
     const schedule = () => {
@@ -3563,7 +3575,7 @@ function useComposerBounds() {
 
     const resize = new ResizeObserver(schedule);
     const attach = () => {
-      const element = document.querySelector('[data-composer-card]');
+      const element = findComposer();
       if (element !== null) resize.observe(element);
     };
     attach();
@@ -3664,13 +3676,27 @@ function WhaleCorner(props) {
     : (today === null ? '' : today.currency);
   const money = (value) => formatMoney(value, currency);
 
-  // Sit just outside the composer's right edge, but only when the viewport
-  // actually leaves room for the bubble and the mascot; otherwise keep the
-  // fixed corner so the widget never leaves the screen.
-  const anchored = composer !== null && (composer.viewport - composer.right) >= 250;
-  const placement = anchored
-    ? { left: `${composer.right + 8}px`, right: 'auto', bottom: `${composer.offset}px` }
-    : null;
+  // Never cover the input box. Prefer standing beside it, aligned to its
+  // bottom edge; when the viewport leaves too little room on that side,
+  // stand above it instead. Only fall back to the plain corner when no
+  // composer is on screen at all.
+  const MASCOT_CLEARANCE = 150;
+  let placement = null;
+  if (composer !== null) {
+    if (composer.viewport - composer.right >= MASCOT_CLEARANCE) {
+      placement = {
+        left: `${composer.right + 8}px`,
+        right: 'auto',
+        bottom: `${composer.offset}px`
+      };
+    } else {
+      placement = {
+        left: 'auto',
+        right: '20px',
+        bottom: `${composer.offset + composer.height + 10}px`
+      };
+    }
+  }
 
   return h('div', { className: 'dsu-whale', style: placement },
     h('style', null, WHALE_CORNER_CSS),
