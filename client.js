@@ -3276,7 +3276,7 @@ const WHALE_CORNER_CSS = `
   }
   .dsu-whale-value {
     color: var(--dsw-alias-label-primary);
-    font-size: 11.5px;
+    font-size: 10.5px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     text-align: left;
@@ -3296,7 +3296,7 @@ const WHALE_CORNER_CSS = `
     .dsu-whale-art, .dsu-whale-img { width: 84px; }
     .dsu-whale-bubble { width: 132px; padding: 8px 10px 9px; left: -30px; bottom: 88px; }
     .dsu-whale-hero-value { font-size: 17px; }
-    .dsu-whale-value { font-size: 11px; }
+    .dsu-whale-value { font-size: 10px; }
   }
 `;
 
