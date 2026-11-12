@@ -3204,18 +3204,16 @@ const WHALE_CORNER_CSS = `
     -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent 99%);
     mask-image: linear-gradient(to bottom, #000 82%, transparent 99%);
   }
+  /* Bare glyph: no plate behind it, just the mark itself. */
   .dsu-whale-q {
     position: absolute;
-    left: -9px;
-    top: -11px;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: #1e40af;
-    color: #fff;
-    font: 700 15px/24px Georgia, "Times New Roman", serif;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(15, 17, 21, .28);
+    left: -7px;
+    top: -13px;
+    color: #3b82f6;
+    font: 700 22px/1 Georgia, "Times New Roman", serif;
+    text-shadow: 0 1px 5px rgba(15, 17, 21, .45);
+    pointer-events: none;
+    user-select: none;
   }
   /* The bubble rests on the mascot's head, offset to the upper left. */
   .dsu-whale-bubble {
