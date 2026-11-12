@@ -3676,16 +3676,19 @@ function WhaleCorner(props) {
     : (today === null ? '' : today.currency);
   const money = (value) => formatMoney(value, currency);
 
-  // Never cover the input box. Prefer standing beside it, aligned to its
-  // bottom edge; when the viewport leaves too little room on that side,
-  // stand above it instead. Only fall back to the plain corner when no
-  // composer is on screen at all.
-  const MASCOT_CLEARANCE = 150;
+  // Never cover the input box. The bubble overhangs the mascot by 34px, so
+  // line the bubble's left edge up with the composer's right edge plus a small
+  // gap instead of aligning the mascot itself. When the viewport leaves too
+  // little room on that side, stand above the composer instead; only fall back
+  // to the plain corner when no composer is on screen at all.
+  const BUBBLE_OVERHANG = 34;
+  const EDGE_GAP = 6;
+  const MASCOT_CLEARANCE = BUBBLE_OVERHANG + EDGE_GAP + 116 + 8;
   let placement = null;
   if (composer !== null) {
     if (composer.viewport - composer.right >= MASCOT_CLEARANCE) {
       placement = {
-        left: `${composer.right + 8}px`,
+        left: `${composer.right + BUBBLE_OVERHANG + EDGE_GAP}px`,
         right: 'auto',
         bottom: `${composer.offset}px`
       };
