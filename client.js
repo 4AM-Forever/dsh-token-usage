@@ -3211,7 +3211,7 @@ const WHALE_CORNER_CSS = `
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: var(--dsw-alias-state-business-primary);
+    background: #1e40af;
     color: #fff;
     font: 700 15px/24px Georgia, "Times New Roman", serif;
     text-align: center;
@@ -3220,7 +3220,7 @@ const WHALE_CORNER_CSS = `
   /* The bubble rests on the mascot's head, offset to the upper left. */
   .dsu-whale-bubble {
     position: absolute;
-    left: -22px;
+    left: -34px;
     bottom: 104px;
     box-sizing: border-box;
     width: 132px;
@@ -3282,7 +3282,7 @@ const WHALE_CORNER_CSS = `
   @media (max-width: 640px) {
     .dsu-whale { width: 84px; }
     .dsu-whale-art, .dsu-whale-img { width: 84px; }
-    .dsu-whale-bubble { width: 118px; padding: 7px 10px 8px; left: -18px; bottom: 74px; }
+    .dsu-whale-bubble { width: 118px; padding: 7px 10px 8px; left: -30px; bottom: 74px; }
     .dsu-whale-remain { font-size: 16px; }
   }
 `;
