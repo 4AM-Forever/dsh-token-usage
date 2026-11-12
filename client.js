@@ -65,26 +65,31 @@ window.__ModuleLoader__.load({
       'whale.todayCost': 'Spent today',
       'whale.todayTokens': 'Tokens today',
       'balance.title': 'Balance API',
-      'balance.subtitle': 'How the remaining balance is read. Probe the known endpoints, or point at your own.',
-      'balance.mode': 'Mode (auto probes until it finds one)',
-      'balance.auth': 'Auth header',
-      'balance.path': 'Endpoint path',
+      'balance.subtitle': 'Remaining balance defaults to DeepSeek\'s documented endpoint, using the key DSH already stores. Override anything below if your account is fronted differently.',
+      'balance.mode': 'Source',
+      'balance.mode.official': 'official endpoint',
+      'balance.mode.custom': 'custom endpoint',
+      'balance.url': 'Endpoint URL',
       'balance.field': 'Balance field path',
       'balance.currency': 'Currency',
-      'balance.placeholder.path': '/api/v0/users/balance',
-      'balance.placeholder.field': 'data.balance_infos.0.total_balance',
+      'balance.apiKey': 'API key (blank = use the stored one)',
+      'balance.placeholder.url': 'https://api.deepseek.com/user/balance',
+      'balance.placeholder.field': 'balance_infos.0.total_balance',
       'balance.placeholder.currency': 'CNY',
-      'balance.probe': 'Probe endpoints',
-      'balance.probing': 'Probing…',
-      'balance.probeOk': 'Found {path} → {field}',
-      'balance.probeNone': 'No known endpoint returned a balance',
+      'balance.placeholder.apiKey': 'sk-...',
+      'balance.diagnose': 'Check now',
+      'balance.diagnosing': 'Checking…',
+      'balance.diagnoseOk': 'Read {value} from {url}',
+      'balance.diagnoseFail': 'Failed: {code}',
       'balance.save': 'Save',
       'balance.saving': 'Saving…',
       'balance.saved': 'Saved',
       'balance.saveFailed': 'Save failed',
       'balance.loading': 'Loading configuration…',
-      'balance.current': 'Reading from {path} → {field}',
+      'balance.current': 'Reading {url} → {field}',
       'balance.currentEmpty': 'No endpoint configured yet',
+      'balance.hostTooOld': 'The Host half is still the previous build — restart DSH to activate the new endpoints.',
+      'balance.hostUnreachable': 'Could not reach the Host bridge.',
       'billing.title': 'Account-wide usage',
       'billing.subtitle': 'Account-wide token and billed usage, including calls outside this profile.',
       'billing.loading': 'Loading account spend…',
@@ -194,26 +199,31 @@ window.__ModuleLoader__.load({
       'whale.todayCost': '今日花费',
       'whale.todayTokens': '今日消耗',
       'balance.title': '余额接口',
-      'balance.subtitle': '剩余金额的读取方式。可以自动探测已知接口，也可以填你自己的。',
-      'balance.mode': '模式（auto 会自动探测）',
-      'balance.auth': '认证头',
-      'balance.path': '接口路径',
+      'balance.subtitle': '剩余金额默认走 DeepSeek 官方接口，使用 DSH 已保存的 API Key。如果你的账号走别的网关，可以改下面的地址和字段。',
+      'balance.mode': '来源',
+      'balance.mode.official': '官方接口',
+      'balance.mode.custom': '自定义接口',
+      'balance.url': '接口地址',
       'balance.field': '余额字段路径',
       'balance.currency': '币种',
-      'balance.placeholder.path': '/api/v0/users/balance',
-      'balance.placeholder.field': 'data.balance_infos.0.total_balance',
+      'balance.apiKey': 'API Key（留空则用已保存的）',
+      'balance.placeholder.url': 'https://api.deepseek.com/user/balance',
+      'balance.placeholder.field': 'balance_infos.0.total_balance',
       'balance.placeholder.currency': 'CNY',
-      'balance.probe': '探测接口',
-      'balance.probing': '探测中…',
-      'balance.probeOk': '命中 {path} → {field}',
-      'balance.probeNone': '已知接口都没有返回余额',
+      'balance.placeholder.apiKey': 'sk-...',
+      'balance.diagnose': '立即检查',
+      'balance.diagnosing': '检查中…',
+      'balance.diagnoseOk': '从 {url} 读到 {value}',
+      'balance.diagnoseFail': '失败：{code}',
       'balance.save': '保存',
       'balance.saving': '保存中…',
       'balance.saved': '已保存',
       'balance.saveFailed': '保存失败',
       'balance.loading': '正在读取配置…',
-      'balance.current': '当前读取 {path} → {field}',
+      'balance.current': '当前读取 {url} → {field}',
       'balance.currentEmpty': '尚未配置接口',
+      'balance.hostTooOld': 'Host 侧还是旧版本，需要重启 DSH 才能启用新接口。',
+      'balance.hostUnreachable': '连不上 Host 桥接接口。',
       'billing.title': '平台账户用量',
       'billing.subtitle': '账户全量的 Token 与计费用量，包含 DSH 之外的调用。',
       'billing.loading': '正在读取账户费用…',
@@ -3314,9 +3324,10 @@ async function fetchBalance() {
 /**
  * Configuration for how the remaining balance is read.
  *
- * The Platform's balance endpoint is private and undocumented, so nothing is
- * assumed: the panel can probe every known spelling, show what answered, and
- * let the operator point at their own endpoint and field path.
+ * The default is DeepSeek's documented endpoint, authenticated with the key
+ * DSH already stores. Because operators may front the account differently,
+ * the endpoint, field path, currency, and key are all editable, and the
+ * diagnose action reports exactly what the Host saw.
  * @param props - carries the bound translate function.
  * @returns the configuration card.
  */
@@ -3341,7 +3352,16 @@ function BalanceConfigPanel(props) {
         ...extra
       })
     });
-    return response.json();
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (_error) {
+      payload = null;
+    }
+    if (payload === null || typeof payload !== 'object') {
+      throw new Error('bad-response');
+    }
+    return payload;
   };
 
   React.useEffect(() => {
@@ -3349,12 +3369,26 @@ function BalanceConfigPanel(props) {
     post('balanceConfig', {})
       .then((payload) => {
         if (!active) return;
-        if (payload?.ok === true && payload.data?.config !== undefined) {
+        if (payload.ok === true && payload.data?.config !== undefined) {
           setConfig(payload.data.config);
           setDraft(payload.data.config);
+        } else {
+          // Older Host halves reject unknown actions; say so instead of
+          // spinning forever on a request that can never succeed.
+          setStatus({ text: t('balance.hostTooOld'), error: true });
+          setDraft({
+            mode: 'official',
+            url: 'https://api.deepseek.com/user/balance',
+            field: 'balance_infos.0.total_balance',
+            currency: 'CNY',
+            apiKey: ''
+          });
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!active) return;
+        setStatus({ text: t('balance.hostUnreachable'), error: true });
+      });
     return () => {
       active = false;
     };
@@ -3370,7 +3404,7 @@ function BalanceConfigPanel(props) {
     setStatus(null);
     try {
       const payload = await post('balanceSave', { config: draft });
-      if (payload?.ok === true && payload.data?.config !== undefined) {
+      if (payload.ok === true && payload.data?.config !== undefined) {
         setConfig(payload.data.config);
         setDraft(payload.data.config);
         setStatus({ text: t('balance.saved'), error: false });
@@ -3384,94 +3418,88 @@ function BalanceConfigPanel(props) {
     }
   };
 
-  const probe = async () => {
-    setBusy('probe');
+  const diagnose = async () => {
+    setBusy('diagnose');
     setStatus(null);
     try {
-      const payload = await post('balanceProbe', { currency: draft?.currency ?? 'CNY' });
-      if (payload?.ok === true && payload.data?.config !== undefined) {
-        const found = payload.data.config;
-        setConfig(found);
-        setDraft(found);
-        setStatus({
-          text: t('balance.probeOk', { path: found.path, field: found.field }),
-          error: false
-        });
+      const payload = await post('balanceDiagnose', {});
+      const data = payload.ok === true ? payload.data : null;
+      if (data !== null && data.ok === true) {
+        const shown = data.balance === undefined
+          ? '—'
+          : `${data.balance.currency} ${data.balance.total}`;
+        setStatus({ text: t('balance.diagnoseOk', { value: shown, url: data.url }), error: false });
+      } else if (data !== null) {
+        setStatus({ text: t('balance.diagnoseFail', { code: data.error || 'unknown' }), error: true });
       } else {
-        setStatus({ text: t('balance.probeNone'), error: true });
+        setStatus({ text: t('balance.diagnoseFail', { code: payload.code || 'unknown' }), error: true });
       }
     } catch (_error) {
-      setStatus({ text: t('balance.probeNone'), error: true });
+      setStatus({ text: t('balance.diagnoseFail', { code: 'bad-response' }), error: true });
     } finally {
       setBusy('');
     }
   };
 
+  const head = h('div', { className: 'dsu-card-head' },
+    h('div', null,
+      h('h2', { className: 'dsu-card-title' }, t('balance.title')),
+      h('p', { className: 'dsu-card-sub' }, t('balance.subtitle'))
+    ),
+    h('div', { className: 'dsu-balance-actions' },
+      h('button', {
+        type: 'button',
+        className: 'dsu-balance-button',
+        onClick: diagnose,
+        disabled: busy !== '' || draft === null
+      }, busy === 'diagnose' ? t('balance.diagnosing') : t('balance.diagnose')),
+      h('button', {
+        type: 'button',
+        className: 'dsu-balance-button',
+        onClick: save,
+        disabled: busy !== '' || draft === null
+      }, busy === 'save' ? t('balance.saving') : t('balance.save'))
+    )
+  );
+
   if (draft === null) {
-    return h('section', { className: 'dsu-card dsu-balance-config' },
-      h('div', { className: 'dsu-card-head' },
-        h('div', null,
-          h('h2', { className: 'dsu-card-title' }, t('balance.title')),
-          h('p', { className: 'dsu-card-sub' }, t('balance.subtitle'))
-        )
-      ),
+    return h('section', { className: 'dsu-card dsu-balance-config' }, head,
       h('p', { className: 'dsu-note' }, t('balance.loading'))
     );
   }
 
-  const field = (key, labelKey, type, options) => h('div', { className: 'dsu-balance-field' },
+  const field = (key, labelKey, placeholderKey, options) => h('div', { className: 'dsu-balance-field' },
     h('label', { htmlFor: `dsu-balance-${key}` }, t(labelKey)),
-    type === 'select'
-      ? h('select', {
-        id: `dsu-balance-${key}`,
-        value: draft[key],
-        onChange: (event) => patch(key, event.target.value)
-      }, options.map((option) => h('option', { key: option, value: option }, option)))
-      : h('input', {
+    options === undefined
+      ? h('input', {
         id: `dsu-balance-${key}`,
         type: 'text',
         value: draft[key],
-        placeholder: t(`balance.placeholder.${key}`),
+        placeholder: placeholderKey === undefined ? '' : t(placeholderKey),
         onChange: (event) => patch(key, event.target.value)
       })
+      : h('select', {
+        id: `dsu-balance-${key}`,
+        value: draft[key],
+        onChange: (event) => patch(key, event.target.value)
+      }, options.map((option) => h('option', { key: option, value: option }, t(`balance.mode.${option}`))))
   );
 
   return h('section', { className: 'dsu-card dsu-balance-config' },
-    h('div', { className: 'dsu-card-head' },
-      h('div', null,
-        h('h2', { className: 'dsu-card-title' }, t('balance.title')),
-        h('p', { className: 'dsu-card-sub' }, t('balance.subtitle'))
-      ),
-      h('div', { className: 'dsu-balance-actions' },
-        h('button', {
-          type: 'button',
-          className: 'dsu-balance-button',
-          onClick: probe,
-          disabled: busy !== ''
-        }, busy === 'probe' ? t('balance.probing') : t('balance.probe')),
-        h('button', {
-          type: 'button',
-          className: 'dsu-balance-button',
-          onClick: save,
-          disabled: busy !== ''
-        }, busy === 'save' ? t('balance.saving') : t('balance.save'))
-      )
-    ),
+    head,
     h('div', { className: 'dsu-balance-grid' },
-      field('mode', 'balance.mode', 'select', ['auto', 'manual']),
-      field('auth', 'balance.auth', 'select', ['both', 'dsh', 'bearer']),
-      field('path', 'balance.path', 'text'),
-      field('field', 'balance.field', 'text'),
-      field('currency', 'balance.currency', 'text')
+      field('mode', 'balance.mode', undefined, ['official', 'custom']),
+      field('currency', 'balance.currency', 'balance.placeholder.currency'),
+      field('url', 'balance.url', 'balance.placeholder.url'),
+      field('field', 'balance.field', 'balance.placeholder.field'),
+      field('apiKey', 'balance.apiKey', 'balance.placeholder.apiKey')
     ),
     status !== null
-      ? h('p', {
-        className: `dsu-balance-status${status.error ? ' is-error' : ''}`
-      }, status.text)
+      ? h('p', { className: `dsu-balance-status${status.error ? ' is-error' : ''}` }, status.text)
       : null,
     h('p', { className: 'dsu-note' },
-      config !== null && config.path !== ''
-        ? t('balance.current', { path: config.path, field: config.field })
+      config !== null && config.url !== ''
+        ? t('balance.current', { url: config.url, field: config.field })
         : t('balance.currentEmpty')
     )
   );
