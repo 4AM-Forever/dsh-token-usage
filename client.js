@@ -3249,7 +3249,7 @@ const WHALE_CORNER_CSS = `
     display: grid;
     grid-template-columns: 1fr max-content;
     align-items: baseline;
-    column-gap: 7px;
+    column-gap: 11px;
     row-gap: 3px;
   }
   .dsu-whale-divider {
@@ -3521,6 +3521,73 @@ function BalanceConfigPanel(props) {
 }
 
 /**
+ * Track the composer card's bottom-right corner.
+ *
+ * The mascot should sit beside the input box and follow it as the composer
+ * resizes. The card is only present on the chat panel and may mount after
+ * this widget, so a ResizeObserver plus a body-level MutationObserver keep
+ * the measurement fresh; the value is quantized so unrelated reflows do not
+ * cause re-renders.
+ * @returns the measured corner, or null when no composer is on screen.
+ */
+function useComposerBounds() {
+  const [bounds, setBounds] = React.useState(null);
+
+  React.useEffect(() => {
+    let frame = 0;
+    let lastKey = '';
+
+    const measure = () => {
+      frame = 0;
+      const element = document.querySelector('[data-composer-card]');
+      if (element === null) {
+        if (lastKey !== '') {
+          lastKey = '';
+          setBounds(null);
+        }
+        return;
+      }
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const right = Math.round(rect.right);
+      const offset = Math.round(window.innerHeight - rect.bottom);
+      const key = `${right}:${offset}:${Math.round(window.innerWidth)}`;
+      if (key === lastKey) return;
+      lastKey = key;
+      setBounds({ right, offset, viewport: window.innerWidth });
+    };
+
+    const schedule = () => {
+      if (frame === 0) frame = window.requestAnimationFrame(measure);
+    };
+
+    const resize = new ResizeObserver(schedule);
+    const attach = () => {
+      const element = document.querySelector('[data-composer-card]');
+      if (element !== null) resize.observe(element);
+    };
+    attach();
+
+    const mutation = new MutationObserver(() => {
+      attach();
+      schedule();
+    });
+    mutation.observe(document.body, { childList: true, subtree: true });
+
+    schedule();
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+      resize.disconnect();
+      mutation.disconnect();
+      window.removeEventListener('resize', schedule);
+    };
+  }, []);
+
+  return bounds;
+}
+
+/**
  * The corner companion itself.
  * @param props - carries the bound translate function.
  * @returns the widget element.
@@ -3530,6 +3597,7 @@ function WhaleCorner(props) {
   const [frame, setFrame] = React.useState(0);
   const [today, setToday] = React.useState(null);
   const [balance, setBalance] = React.useState(null);
+  const composer = useComposerBounds();
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
@@ -3596,7 +3664,15 @@ function WhaleCorner(props) {
     : (today === null ? '' : today.currency);
   const money = (value) => formatMoney(value, currency);
 
-  return h('div', { className: 'dsu-whale' },
+  // Sit just outside the composer's right edge, but only when the viewport
+  // actually leaves room for the bubble and the mascot; otherwise keep the
+  // fixed corner so the widget never leaves the screen.
+  const anchored = composer !== null && (composer.viewport - composer.right) >= 250;
+  const placement = anchored
+    ? { left: `${composer.right + 8}px`, right: 'auto', bottom: `${composer.offset}px` }
+    : null;
+
+  return h('div', { className: 'dsu-whale', style: placement },
     h('style', null, WHALE_CORNER_CSS),
     h('div', { className: 'dsu-whale-art' },
       h('img', {
