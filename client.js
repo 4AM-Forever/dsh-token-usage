@@ -392,7 +392,7 @@ window.__ModuleLoader__.load({
           + nonNegative(totals.promptCacheMiss)
           + nonNegative(totals.completion);
         root.style.setProperty('--dsh-token-usage-sidebar-today', JSON.stringify(
-          ` ${formatCompactTokens(tokens)} · ${formatCost2(nonNegative(totals.cost), typeof payload.data.currency === 'string' ? payload.data.currency : '')}`
+          ` ${formatCost2(nonNegative(totals.cost), typeof payload.data.currency === 'string' ? payload.data.currency : '')} · ${formatTokens(tokens, 'metric')}`
         ));
         return;
       }
@@ -897,18 +897,6 @@ window.__ModuleLoader__.load({
       const digits = amount > 0 && amount < 1 ? 4 : 2;
       const suffix = symbol === '' && typeof currency === 'string' && currency !== '' ? ` ${currency}` : '';
       return `${symbol}${amount.toFixed(digits)}${suffix}`;
-    }
-
-    /**
-     * Format a token count for the compact sidebar: 万 below ten million,
-     * otherwise 亿, always with exactly two decimals.
-     * @param value - token count.
-     * @returns the sidebar label fragment, for example `1.23万` or `1.23亿`.
-     */
-    function formatCompactTokens(value) {
-      const amount = typeof value === 'number' && Number.isFinite(value) ? value : 0;
-      if (amount >= 10000000) return `${(amount / 100000000).toFixed(2)}亿`;
-      return `${(amount / 10000).toFixed(2)}万`;
     }
 
     /**
