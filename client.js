@@ -392,7 +392,7 @@ window.__ModuleLoader__.load({
           + nonNegative(totals.promptCacheMiss)
           + nonNegative(totals.completion);
         root.style.setProperty('--dsh-token-usage-sidebar-today', JSON.stringify(
-          ` ${formatCost2(nonNegative(totals.cost), typeof payload.data.currency === 'string' ? payload.data.currency : '')} · ${formatTokens(tokens, 'metric')}`
+          ` ${formatCost2(nonNegative(totals.cost), typeof payload.data.currency === 'string' ? payload.data.currency : '')} / ${formatTokens(tokens, 'metric')}`
         ));
         return;
       }
