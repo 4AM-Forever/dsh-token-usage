@@ -3242,48 +3242,60 @@ const WHALE_CORNER_CSS = `
     background: var(--dsw-alias-bg-layer-1);
     transform: rotate(45deg);
   }
-  .dsu-whale-line1 {
-    display: flex;
+  /* One grid for the whole readout: the figure column is right-aligned and
+     the label column is sized to its widest entry, so every figure ends on
+     one edge and every label starts on another. */
+  .dsu-whale-grid {
+    display: grid;
+    grid-template-columns: 1fr max-content;
     align-items: baseline;
-    gap: 5px;
+    column-gap: 7px;
+    row-gap: 3px;
   }
-  .dsu-whale-key {
-    color: var(--dsw-alias-label-secondary);
-    font-size: 10px;
-    white-space: nowrap;
+  .dsu-whale-divider {
+    grid-column: 1 / -1;
+    height: 1px;
+    margin: 3px 0;
+    background: var(--dsw-alias-border-l1);
   }
-  .dsu-whale-remain {
-    font-size: 18px;
+  .dsu-whale-hero-value {
+    font-size: 20px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -.02em;
-    line-height: 1.15;
+    letter-spacing: -.03em;
+    line-height: 1.1;
+    text-align: right;
     white-space: nowrap;
   }
-  .dsu-whale-remain.is-negative {
+  .dsu-whale-hero-value.is-negative {
     color: var(--dsw-alias-state-error-primary);
   }
-  .dsu-whale-row {
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
-    margin-top: 3px;
+  .dsu-whale-hero-value.is-pending {
     color: var(--dsw-alias-label-secondary);
-    font-size: 10px;
+  }
+  .dsu-whale-value {
+    color: var(--dsw-alias-label-primary);
+    font-size: 11.5px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
+    text-align: right;
     white-space: nowrap;
   }
-  .dsu-whale-row strong {
-    color: var(--dsw-alias-label-primary);
-    font-size: 11px;
-    font-weight: 600;
+  .dsu-whale-value.is-pending {
+    color: var(--dsw-alias-label-secondary);
   }
-  .dsu-whale-row.is-pending strong { color: var(--dsw-alias-label-secondary); }
+  .dsu-whale-label {
+    color: var(--dsw-alias-label-secondary);
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
   @media (max-width: 640px) {
     .dsu-whale { width: 84px; }
     .dsu-whale-art, .dsu-whale-img { width: 84px; }
-    .dsu-whale-bubble { width: 118px; padding: 7px 10px 8px; left: -30px; bottom: 74px; }
-    .dsu-whale-remain { font-size: 16px; }
+    .dsu-whale-bubble { width: 122px; padding: 7px 10px 8px; left: -30px; bottom: 74px; }
+    .dsu-whale-hero-value { font-size: 17px; }
+    .dsu-whale-value { font-size: 11px; }
   }
 `;
 
@@ -3597,19 +3609,20 @@ function WhaleCorner(props) {
     h('div', { className: 'dsu-whale-bubble' },
       h('span', { className: 'dsu-whale-q', 'aria-hidden': 'true' }, '?'),
       h('div', { className: 'dsu-whale-tail', 'aria-hidden': 'true' }),
-      h('div', { className: 'dsu-whale-line1' },
+      h('div', { className: 'dsu-whale-grid' },
         h('span', {
-          className: `dsu-whale-remain${remaining !== null && remaining < 0 ? ' is-negative' : ''}`
+          className: `dsu-whale-hero-value${remaining === null ? ' is-pending' : ''}${remaining !== null && remaining < 0 ? ' is-negative' : ''}`
         }, remaining === null ? '—' : money(remaining)),
-        h('span', { className: 'dsu-whale-key' }, t('whale.remaining'))
-      ),
-      h('div', { className: `dsu-whale-row${spent === null ? ' is-pending' : ''}` },
-        h('strong', null, spent === null ? '—' : money(spent)),
-        h('span', null, t('whale.todayCost'))
-      ),
-      h('div', { className: `dsu-whale-row${today === null ? ' is-pending' : ''}` },
-        h('strong', null, today === null ? '—' : formatTokens(today.tokens, 'wan')),
-        h('span', null, t('whale.todayTokens'))
+        h('span', { className: 'dsu-whale-label' }, t('whale.remaining')),
+        h('span', { className: 'dsu-whale-divider', 'aria-hidden': 'true' }),
+        h('span', {
+          className: `dsu-whale-value${spent === null ? ' is-pending' : ''}`
+        }, spent === null ? '—' : money(spent)),
+        h('span', { className: 'dsu-whale-label' }, t('whale.todayCost')),
+        h('span', {
+          className: `dsu-whale-value${today === null ? ' is-pending' : ''}`
+        }, today === null ? '—' : formatTokens(today.tokens, 'wan')),
+        h('span', { className: 'dsu-whale-label' }, t('whale.todayTokens'))
       )
     )
   );
