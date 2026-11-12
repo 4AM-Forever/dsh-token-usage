@@ -3185,13 +3185,16 @@ const WHALE_CORNER_CSS = `
     right: 20px;
     bottom: 20px;
     z-index: 1000;
-    width: 116px;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
     pointer-events: auto;
     font-family: inherit;
     color: var(--dsw-alias-label-primary);
   }
   .dsu-whale-art {
     position: relative;
+    flex: none;
     width: 116px;
     user-select: none;
   }
@@ -3216,12 +3219,11 @@ const WHALE_CORNER_CSS = `
     text-align: center;
     box-shadow: 0 2px 8px rgba(15, 17, 21, .28);
   }
-  /* The bubble sits above the mascot's head, to its left. */
+  /* The bubble clears the mascot to its upper right. */
   .dsu-whale-bubble {
-    position: absolute;
-    right: calc(100% + 10px);
-    bottom: 74px;
+    position: relative;
     width: 128px;
+    margin-bottom: 84px;
     padding: 8px 11px 9px;
     border: 1px solid var(--dsw-alias-border-l2);
     border-radius: 14px;
@@ -3230,15 +3232,15 @@ const WHALE_CORNER_CSS = `
   }
   .dsu-whale-tail {
     position: absolute;
-    right: -6px;
-    bottom: 10px;
+    left: 26px;
+    bottom: -6px;
     width: 11px;
     height: 11px;
     border-right: 1px solid var(--dsw-alias-border-l2);
     border-bottom: 1px solid var(--dsw-alias-border-l2);
     border-radius: 0 0 3px 0;
     background: var(--dsw-alias-bg-layer-1);
-    transform: rotate(-45deg);
+    transform: rotate(45deg);
   }
   .dsu-whale-line1 {
     display: flex;
@@ -3278,8 +3280,8 @@ const WHALE_CORNER_CSS = `
   }
   .dsu-whale-row.is-pending strong { color: var(--dsw-alias-label-secondary); }
   @media (max-width: 640px) {
-    .dsu-whale, .dsu-whale-art, .dsu-whale-img { width: 84px; }
-    .dsu-whale-bubble { width: 118px; padding: 7px 10px 8px; bottom: 58px; }
+    .dsu-whale-art, .dsu-whale-img { width: 84px; }
+    .dsu-whale-bubble { width: 118px; padding: 7px 10px 8px; margin-bottom: 60px; }
     .dsu-whale-remain { font-size: 16px; }
   }
 `;
