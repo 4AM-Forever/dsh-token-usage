@@ -6,6 +6,9 @@
  * page can show real billed spend without exposing the account credential to
  * the browser. The route returns aggregates only; it never returns the token.
  */
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 export const inject = ['webServer'];
 
 /** Same-origin bridge path used by the Client half. */
@@ -416,73 +419,280 @@ function amountOrUndefined(value) {
   return undefined;
 }
 
+/** Where the learned balance configuration lives, beside the package. */
+const BALANCE_CONFIG_FILE = fileURLToPath(new URL('./balance-config.json', import.meta.url));
+
+/** Header spellings the private Platform endpoint has accepted. */
+const AUTH_MODES = ['both', 'dsh', 'bearer'];
+
+/** Paths worth trying against the signed-in Platform account. */
+const BALANCE_PATHS = [
+  '/api/v0/users/balance',
+  '/api/v0/user/balance',
+  '/api/v0/user/info',
+  '/api/v0/user/account',
+  '/api/v0/user/credit',
+  '/api/v0/billing/balance',
+  '/api/v0/usage/balance',
+  '/api/v0/usage/quota',
+  '/api/v0/topup/balance',
+  '/api/v0/credit/balance',
+  '/api/v0/account/balance'
+];
+
+/** Key names that plausibly carry a remaining amount. */
+const AMOUNT_KEYS = /^(balance|total_balance|totalBalance|remaining|remain|amount|available|credit|quota|balance_amount)$/i;
+
+/** Default configuration used until a probe succeeds or the user saves one. */
+const BALANCE_DEFAULT_CONFIG = {
+  mode: 'auto',
+  path: '',
+  auth: 'both',
+  field: '',
+  currency: 'CNY'
+};
+
+/** In-memory cache of the last successful probe, keyed by origin. */
+const balanceProbeCache = new Map();
+
 /**
- * Extract the account balance from one Platform payload.
- *
- * The private endpoint is undocumented and has appeared in more than one
- * shape, so every known spelling is tried before giving up.
- * @param payload - parsed Platform JSON.
- * @returns the balance record, or undefined when nothing usable was present.
+ * Normalize one user-supplied configuration object.
+ * @param value - candidate from disk or a request body.
+ * @returns a complete configuration record.
  */
-function parseBalance(payload) {
-  const root = payload?.data?.biz_data ?? payload?.data ?? {};
-  const infos = root?.balance_infos ?? root?.balanceInfos ?? root?.balances;
-  if (Array.isArray(infos) && infos.length > 0) {
-    const cny = infos.find((info) => String(info?.currency ?? '').toUpperCase() === 'CNY');
-    const info = cny ?? infos[0];
-    const total = amountOrUndefined(
-      info?.total_balance ?? info?.totalBalance ?? info?.balance ?? info?.amount
-    );
-    if (total !== undefined) {
-      return {
-        currency: String(info?.currency ?? ''),
-        total,
-        granted: amountOrUndefined(info?.granted_balance ?? info?.grantedBalance) ?? 0,
-        toppedUp: amountOrUndefined(info?.topped_up_balance ?? info?.toppedUpBalance) ?? 0
-      };
-    }
+function normalizeBalanceConfig(value) {
+  const source = value !== null && typeof value === 'object' ? value : {};
+  const mode = source.mode === 'manual' ? 'manual' : 'auto';
+  return {
+    mode,
+    path: typeof source.path === 'string' ? source.path.trim() : '',
+    auth: AUTH_MODES.includes(source.auth) ? source.auth : BALANCE_DEFAULT_CONFIG.auth,
+    field: typeof source.field === 'string' ? source.field.trim() : '',
+    currency: typeof source.currency === 'string' && source.currency !== ''
+      ? source.currency.toUpperCase()
+      : BALANCE_DEFAULT_CONFIG.currency
+  };
+}
+
+/**
+ * Load the persisted configuration, falling back to the default.
+ * @returns the configuration record.
+ */
+function loadBalanceConfig() {
+  try {
+    const raw = readFileSync(BALANCE_CONFIG_FILE, 'utf8');
+    return normalizeBalanceConfig(JSON.parse(raw));
+  } catch (_error) {
+    return { ...BALANCE_DEFAULT_CONFIG };
   }
-  const direct = amountOrUndefined(
-    root?.balance ?? root?.total_balance ?? root?.totalBalance ?? root?.remaining ?? root?.remain
-  );
-  if (direct !== undefined) {
-    return {
-      currency: String(root?.currency ?? ''),
-      total: direct,
-      granted: 0,
-      toppedUp: 0
-    };
+}
+
+/**
+ * Persist one configuration record.
+ * @param config - normalized configuration.
+ */
+function saveBalanceConfig(config) {
+  try {
+    writeFileSync(BALANCE_CONFIG_FILE, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+  } catch (_error) {
+    // A read-only package directory only costs persistence across restarts.
+  }
+}
+
+/**
+ * Walk one dotted field path such as `data.balance_infos.0.total_balance`.
+ * @param root - parsed JSON.
+ * @param path - dotted path.
+ * @returns the value, or undefined when the path does not resolve.
+ */
+function readField(root, path) {
+  if (path === '') return undefined;
+  let node = root;
+  for (const part of path.split('.')) {
+    if (node === null || typeof node !== 'object') return undefined;
+    node = Array.isArray(node) ? node[Number.parseInt(part, 10)] : node[part];
+  }
+  return node;
+}
+
+/**
+ * Find every plausible balance amount inside an unknown payload.
+ *
+ * The private endpoint is undocumented, so rather than guessing a fixed
+ * shape the probe discovers one and records the path that produced it.
+ * @param root - parsed JSON.
+ * @param currency - preferred currency code.
+ * @returns candidate amounts with their paths, best first.
+ */
+function discoverAmounts(root, currency) {
+  const found = [];
+
+  const visit = (node, path, keyHint, depth) => {
+    if (depth > 6 || node === null || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => visit(item, `${path}${path === '' ? '' : '.'}${index}`, keyHint, depth + 1));
+      return;
+    }
+    const nodeCurrency = typeof node.currency === 'string' ? node.currency.toUpperCase() : '';
+    for (const [key, value] of Object.entries(node)) {
+      const childPath = `${path}${path === '' ? '' : '.'}${key}`;
+      const amount = amountOrUndefined(value);
+      if (amount !== undefined && AMOUNT_KEYS.test(key)) {
+        const matchesCurrency = nodeCurrency === '' || nodeCurrency === currency;
+        found.push({
+          path: childPath,
+          value: amount,
+          currency: nodeCurrency === '' ? currency : nodeCurrency,
+          rank: (matchesCurrency ? 0 : 2) + (key.toLowerCase() === 'total_balance' ? 0 : 1)
+        });
+      }
+      visit(value, childPath, key, depth + 1);
+    }
+  };
+
+  visit(root, '', '', 0);
+  found.sort((left, right) => left.rank - right.rank);
+  return found;
+}
+
+/**
+ * Perform one candidate request and report whether it carried an amount.
+ * @param session - Host-only Platform session.
+ * @param path - candidate path.
+ * @param mode - authentication header mode.
+ * @param tzSec - local UTC offset in seconds.
+ * @param currency - preferred currency code.
+ * @returns the discovered configuration, or undefined.
+ */
+async function probeCandidate(session, path, mode, tzSec, currency) {
+  let payload;
+  try {
+    payload = await platformGet(session, path, new URLSearchParams(), mode, tzSec);
+  } catch (_error) {
+    return undefined;
+  }
+  const amounts = discoverAmounts(payload, currency);
+  if (amounts.length === 0) return undefined;
+  return {
+    mode: 'manual',
+    path,
+    auth: mode,
+    field: amounts[0].path,
+    currency: amounts[0].currency,
+    value: amounts[0].value
+  };
+}
+
+/**
+ * Try every known path and header spelling until one answers with an amount.
+ * @param session - Host-only Platform session.
+ * @param tzSec - local UTC offset in seconds.
+ * @param currency - preferred currency code.
+ * @returns the learned configuration, or undefined when nothing answered.
+ */
+async function probeBalance(session, tzSec, currency) {
+  const origin = String(session.origin).replace(/\/+$/, '');
+  const cached = balanceProbeCache.get(origin);
+  if (cached !== undefined) return cached;
+  for (const path of BALANCE_PATHS) {
+    for (const mode of AUTH_MODES) {
+      const hit = await probeCandidate(session, path, mode, tzSec, currency);
+      if (hit !== undefined) {
+        balanceProbeCache.set(origin, hit);
+        return hit;
+      }
+    }
   }
   return undefined;
 }
 
 /**
- * Ask the Platform for the signed-in account's remaining balance.
+ * Fingerprint the configured model catalog so a change can be detected.
  *
- * Several path and header spellings are attempted because the endpoint is
- * private and has moved before; the first usable answer wins.
+ * The balance endpoint is private, so the set of configured providers and
+ * models is the signal that the operator changed something worth re-probing.
+ * @param llm - the Host `llm` service, when present.
+ * @returns a stable string, or an empty string when unreadable.
+ */
+async function modelFingerprint(llm) {
+  try {
+    const providers = llm.listProviders();
+    const parts = [providers.map((provider) => String(provider?.id ?? '')).join(',')];
+    for (const provider of providers) {
+      try {
+        const models = await llm.listModels(provider.id);
+        parts.push(`${provider.id}:${models.map((model) => String(model?.id ?? '')).join(',')}`);
+      } catch (_error) {
+        parts.push(`${provider.id}:?`);
+      }
+    }
+    return parts.join('|');
+  } catch (_error) {
+    return '';
+  }
+}
+
+/**
+ * Drop the learned balance configuration so the next read probes again.
+ */
+function invalidateBalanceProbe() {
+  balanceProbeCache.clear();
+}
+
+/**
+ * Read the remaining balance using the saved configuration, probing once
+ * when the configuration is still automatic.
  * @param session - Host-only Platform session.
  * @param tzSec - local UTC offset in seconds.
- * @returns the balance record.
- * @throws BillingError when no candidate answers.
+ * @returns the resolved balance and the configuration that produced it.
  */
-async function fetchBalance(session, tzSec) {
-  const paths = ['/api/v0/users/balance', '/api/v0/user/balance', '/api/v0/user/info'];
-  const modes = ['both', 'dsh', 'bearer'];
-  let lastError;
-  for (const mode of modes) {
-    for (const path of paths) {
-      try {
-        const payload = await platformGet(session, path, new URLSearchParams(), mode, tzSec);
-        const parsed = parseBalance(payload);
-        if (parsed !== undefined) return parsed;
-      } catch (error) {
-        lastError = error;
-        if (!(error instanceof BillingError)) throw error;
+async function readBalance(session, tzSec) {
+  const saved = loadBalanceConfig();
+  const configured = saved.path !== '' && saved.field !== '';
+
+  if (saved.mode === 'manual' && configured) {
+    const payload = await platformGet(session, saved.path, new URLSearchParams(), saved.auth, tzSec);
+    const raw = readField(payload, saved.field);
+    const total = amountOrUndefined(raw);
+    if (total === undefined) throw new BillingError('balance-unreadable');
+    return { total, currency: saved.currency, config: saved, lastRaw: undefined };
+  }
+
+  const learned = await probeBalance(session, tzSec, saved.currency === '' ? 'CNY' : saved.currency);
+  if (learned === undefined) throw new BillingError('balance-unavailable');
+  const next = normalizeBalanceConfig({
+    mode: 'manual',
+    path: learned.path,
+    auth: learned.auth,
+    field: learned.field,
+    currency: learned.currency
+  });
+  saveBalanceConfig(next);
+  return { total: learned.value, currency: next.currency, config: next };
+}
+
+/**
+ * The configuration a probe produced, plus the discovered candidates, so the
+ * panel can show what was learned and let the user override it.
+ * @param session - Host-only Platform session.
+ * @param tzSec - local UTC offset in seconds.
+ * @param currency - preferred currency code.
+ * @returns every path that answered, with its parsed values.
+ */
+async function surveyBalance(session, tzSec, currency) {
+  const answered = [];
+  for (const path of BALANCE_PATHS) {
+    for (const mode of AUTH_MODES) {
+      const hit = await probeCandidate(session, path, mode, tzSec, currency);
+      if (hit !== undefined) {
+        answered.push(hit);
+        const origin = String(session.origin).replace(/\/+$/, '');
+        balanceProbeCache.set(origin, hit);
+        return { config: hit, answered };
       }
     }
   }
-  throw lastError ?? new BillingError('balance-unavailable');
+  return { config: undefined, answered };
 }
 
 /**
@@ -526,9 +736,63 @@ async function handleBilling(ctx, action, body) {
     const tzSec = Number.isInteger(tzValue) && tzValue >= -14 * 60 * 60 && tzValue <= 14 * 60 * 60
       ? tzValue
       : -new Date().getTimezoneOffset() * 60;
+    const balance = await readBalance(session, tzSec);
     return {
       ok: true,
-      data: await fetchBalance(session, tzSec),
+      data: balance,
+      usageUrl: url
+    };
+  }
+  if (action === 'balanceConfig') {
+    return {
+      ok: true,
+      data: { config: loadBalanceConfig() },
+      usageUrl: url
+    };
+  }
+  if (action === 'balanceSave') {
+    const next = normalizeBalanceConfig(body.config);
+    saveBalanceConfig(next);
+    balanceProbeCache.clear();
+    return {
+      ok: true,
+      data: { config: next },
+      usageUrl: url
+    };
+  }
+  if (action === 'balanceProbe') {
+    let session = null;
+    try {
+      session = account === undefined ? null : await account.getPlatformSession();
+    } catch (_error) {
+      session = null;
+    }
+    if (session === null) {
+      return {
+        ok: false,
+        code: 'not-signed-in',
+        usageUrl: url
+      };
+    }
+    const tzValue = Number(body.tz);
+    const tzSec = Number.isInteger(tzValue) && tzValue >= -14 * 60 * 60 && tzValue <= 14 * 60 * 60
+      ? tzValue
+      : -new Date().getTimezoneOffset() * 60;
+    const currency = typeof body.currency === 'string' && body.currency !== '' ? body.currency : 'CNY';
+    const survey = await surveyBalance(session, tzSec, currency);
+    if (survey.config !== undefined) {
+      const next = normalizeBalanceConfig(survey.config);
+      saveBalanceConfig(next);
+      return {
+        ok: true,
+        data: { config: next, answered: survey.answered },
+        usageUrl: url
+      };
+    }
+    return {
+      ok: false,
+      code: 'balance-unavailable',
+      data: { config: loadBalanceConfig(), answered: [] },
       usageUrl: url
     };
   }
@@ -583,6 +847,29 @@ async function handleBilling(ctx, action, body) {
  * @param ctx - Host context.
  */
 export function apply(ctx) {
+  ctx.effect(() => {
+    const llm = ctx.get('llm');
+    if (llm === undefined || typeof llm.listProviders !== 'function') return undefined;
+    let last = '';
+    let alive = true;
+    const tick = async () => {
+      const fingerprint = await modelFingerprint(llm);
+      if (!alive) return;
+      if (fingerprint === '') return;
+      if (last !== '' && fingerprint !== last) {
+        // A provider or model was added, changed, or removed: the account
+        // surface may have moved with it, so probe again on next read.
+        invalidateBalanceProbe();
+      }
+      last = fingerprint;
+    };
+    tick();
+    const timer = setInterval(tick, 30000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, 'dsh-token-usage: model catalog watch');
   ctx.effect(
     () => ctx.webServer.register({
       kind: 'exact',

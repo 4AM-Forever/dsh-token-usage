@@ -64,6 +64,27 @@ window.__ModuleLoader__.load({
       'whale.remaining': 'Left',
       'whale.todayCost': 'Spent today',
       'whale.todayTokens': 'Tokens today',
+      'balance.title': 'Balance API',
+      'balance.subtitle': 'How the remaining balance is read. Probe the known endpoints, or point at your own.',
+      'balance.mode': 'Mode (auto probes until it finds one)',
+      'balance.auth': 'Auth header',
+      'balance.path': 'Endpoint path',
+      'balance.field': 'Balance field path',
+      'balance.currency': 'Currency',
+      'balance.placeholder.path': '/api/v0/users/balance',
+      'balance.placeholder.field': 'data.balance_infos.0.total_balance',
+      'balance.placeholder.currency': 'CNY',
+      'balance.probe': 'Probe endpoints',
+      'balance.probing': 'Probing…',
+      'balance.probeOk': 'Found {path} → {field}',
+      'balance.probeNone': 'No known endpoint returned a balance',
+      'balance.save': 'Save',
+      'balance.saving': 'Saving…',
+      'balance.saved': 'Saved',
+      'balance.saveFailed': 'Save failed',
+      'balance.loading': 'Loading configuration…',
+      'balance.current': 'Reading from {path} → {field}',
+      'balance.currentEmpty': 'No endpoint configured yet',
       'billing.title': 'Account-wide usage',
       'billing.subtitle': 'Account-wide token and billed usage, including calls outside this profile.',
       'billing.loading': 'Loading account spend…',
@@ -172,6 +193,27 @@ window.__ModuleLoader__.load({
       'whale.remaining': '剩余',
       'whale.todayCost': '今日花费',
       'whale.todayTokens': '今日消耗',
+      'balance.title': '余额接口',
+      'balance.subtitle': '剩余金额的读取方式。可以自动探测已知接口，也可以填你自己的。',
+      'balance.mode': '模式（auto 会自动探测）',
+      'balance.auth': '认证头',
+      'balance.path': '接口路径',
+      'balance.field': '余额字段路径',
+      'balance.currency': '币种',
+      'balance.placeholder.path': '/api/v0/users/balance',
+      'balance.placeholder.field': 'data.balance_infos.0.total_balance',
+      'balance.placeholder.currency': 'CNY',
+      'balance.probe': '探测接口',
+      'balance.probing': '探测中…',
+      'balance.probeOk': '命中 {path} → {field}',
+      'balance.probeNone': '已知接口都没有返回余额',
+      'balance.save': '保存',
+      'balance.saving': '保存中…',
+      'balance.saved': '已保存',
+      'balance.saveFailed': '保存失败',
+      'balance.loading': '正在读取配置…',
+      'balance.current': '当前读取 {path} → {field}',
+      'balance.currentEmpty': '尚未配置接口',
       'billing.title': '平台账户用量',
       'billing.subtitle': '账户全量的 Token 与计费用量，包含 DSH 之外的调用。',
       'billing.loading': '正在读取账户费用…',
@@ -1644,6 +1686,62 @@ window.__ModuleLoader__.load({
         line-height: 1.5;
       }
       .dsu-billing-empty-title { font-size: 13px; font-weight: 600; }
+      .dsu-balance-config { margin-top: 16px; }
+      .dsu-balance-config .dsu-card-head { margin-bottom: 10px; }
+      .dsu-balance-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 16px;
+      }
+      .dsu-balance-field { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+      .dsu-balance-field label {
+        color: var(--dsw-alias-label-secondary);
+        font-size: 11px;
+      }
+      .dsu-balance-field input,
+      .dsu-balance-field select {
+        height: 30px;
+        padding: 0 8px;
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: 8px;
+        background: var(--dsw-alias-bg-layer-1);
+        color: var(--dsw-alias-label-primary);
+        font: inherit;
+        font-size: 11.5px;
+        outline: none;
+      }
+      .dsu-balance-field input:focus,
+      .dsu-balance-field select:focus {
+        border-color: var(--dsw-alias-brand-primary);
+        outline: 2px solid var(--dsw-alias-brand-primary);
+        outline-offset: 1px;
+      }
+      .dsu-balance-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .dsu-balance-button {
+        padding: 5px 11px;
+        border: 1px solid var(--dsw-alias-border-l1);
+        border-radius: 8px;
+        background: var(--dsw-alias-bg-layer-2);
+        color: var(--dsw-alias-label-primary);
+        cursor: pointer;
+        font: inherit;
+        font-size: 11.5px;
+      }
+      .dsu-balance-button:disabled { cursor: default; opacity: .55; }
+      .dsu-balance-status {
+        color: var(--dsw-alias-label-secondary);
+        font-size: 11px;
+      }
+      .dsu-balance-status.is-error { color: var(--dsw-alias-state-error-primary); }
+      @media (max-width: 760px) {
+        .dsu-balance-grid { grid-template-columns: minmax(0, 1fr); }
+      }
       .dsu-billing-empty-body {
         max-width: 560px;
         margin: 5px 0 0;
@@ -2912,6 +3010,7 @@ window.__ModuleLoader__.load({
                     )
                   )
           ),
+          h(BalanceConfigPanel, { translate: t }),
           h('section', { className: 'dsu-card', 'aria-labelledby': 'dsu-chart-title' },
             h('div', { className: 'dsu-card-head' },
               h('div', null,
@@ -3210,6 +3309,172 @@ async function fetchBalance() {
     total,
     currency: typeof payload.data.currency === 'string' ? payload.data.currency : ''
   };
+}
+
+/**
+ * Configuration for how the remaining balance is read.
+ *
+ * The Platform's balance endpoint is private and undocumented, so nothing is
+ * assumed: the panel can probe every known spelling, show what answered, and
+ * let the operator point at their own endpoint and field path.
+ * @param props - carries the bound translate function.
+ * @returns the configuration card.
+ */
+function BalanceConfigPanel(props) {
+  const t = typeof props.translate === 'function' ? props.translate : (key) => key;
+  const [config, setConfig] = React.useState(null);
+  const [draft, setDraft] = React.useState(null);
+  const [busy, setBusy] = React.useState('');
+  const [status, setStatus] = React.useState(null);
+
+  const post = async (action, extra) => {
+    const response = await fetch(BILLING_ROUTE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'content-type': 'application/json',
+        'x-dsh-usage-client': '1'
+      },
+      body: JSON.stringify({
+        action,
+        tz: -new Date().getTimezoneOffset() * 60,
+        ...extra
+      })
+    });
+    return response.json();
+  };
+
+  React.useEffect(() => {
+    let active = true;
+    post('balanceConfig', {})
+      .then((payload) => {
+        if (!active) return;
+        if (payload?.ok === true && payload.data?.config !== undefined) {
+          setConfig(payload.data.config);
+          setDraft(payload.data.config);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const patch = (key, value) => {
+    setDraft((current) => (current === null ? current : { ...current, [key]: value }));
+  };
+
+  const save = async () => {
+    if (draft === null) return;
+    setBusy('save');
+    setStatus(null);
+    try {
+      const payload = await post('balanceSave', { config: draft });
+      if (payload?.ok === true && payload.data?.config !== undefined) {
+        setConfig(payload.data.config);
+        setDraft(payload.data.config);
+        setStatus({ text: t('balance.saved'), error: false });
+      } else {
+        setStatus({ text: t('balance.saveFailed'), error: true });
+      }
+    } catch (_error) {
+      setStatus({ text: t('balance.saveFailed'), error: true });
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const probe = async () => {
+    setBusy('probe');
+    setStatus(null);
+    try {
+      const payload = await post('balanceProbe', { currency: draft?.currency ?? 'CNY' });
+      if (payload?.ok === true && payload.data?.config !== undefined) {
+        const found = payload.data.config;
+        setConfig(found);
+        setDraft(found);
+        setStatus({
+          text: t('balance.probeOk', { path: found.path, field: found.field }),
+          error: false
+        });
+      } else {
+        setStatus({ text: t('balance.probeNone'), error: true });
+      }
+    } catch (_error) {
+      setStatus({ text: t('balance.probeNone'), error: true });
+    } finally {
+      setBusy('');
+    }
+  };
+
+  if (draft === null) {
+    return h('section', { className: 'dsu-card dsu-balance-config' },
+      h('div', { className: 'dsu-card-head' },
+        h('div', null,
+          h('h2', { className: 'dsu-card-title' }, t('balance.title')),
+          h('p', { className: 'dsu-card-sub' }, t('balance.subtitle'))
+        )
+      ),
+      h('p', { className: 'dsu-note' }, t('balance.loading'))
+    );
+  }
+
+  const field = (key, labelKey, type, options) => h('div', { className: 'dsu-balance-field' },
+    h('label', { htmlFor: `dsu-balance-${key}` }, t(labelKey)),
+    type === 'select'
+      ? h('select', {
+        id: `dsu-balance-${key}`,
+        value: draft[key],
+        onChange: (event) => patch(key, event.target.value)
+      }, options.map((option) => h('option', { key: option, value: option }, option)))
+      : h('input', {
+        id: `dsu-balance-${key}`,
+        type: 'text',
+        value: draft[key],
+        placeholder: t(`balance.placeholder.${key}`),
+        onChange: (event) => patch(key, event.target.value)
+      })
+  );
+
+  return h('section', { className: 'dsu-card dsu-balance-config' },
+    h('div', { className: 'dsu-card-head' },
+      h('div', null,
+        h('h2', { className: 'dsu-card-title' }, t('balance.title')),
+        h('p', { className: 'dsu-card-sub' }, t('balance.subtitle'))
+      ),
+      h('div', { className: 'dsu-balance-actions' },
+        h('button', {
+          type: 'button',
+          className: 'dsu-balance-button',
+          onClick: probe,
+          disabled: busy !== ''
+        }, busy === 'probe' ? t('balance.probing') : t('balance.probe')),
+        h('button', {
+          type: 'button',
+          className: 'dsu-balance-button',
+          onClick: save,
+          disabled: busy !== ''
+        }, busy === 'save' ? t('balance.saving') : t('balance.save'))
+      )
+    ),
+    h('div', { className: 'dsu-balance-grid' },
+      field('mode', 'balance.mode', 'select', ['auto', 'manual']),
+      field('auth', 'balance.auth', 'select', ['both', 'dsh', 'bearer']),
+      field('path', 'balance.path', 'text'),
+      field('field', 'balance.field', 'text'),
+      field('currency', 'balance.currency', 'text')
+    ),
+    status !== null
+      ? h('p', {
+        className: `dsu-balance-status${status.error ? ' is-error' : ''}`
+      }, status.text)
+      : null,
+    h('p', { className: 'dsu-note' },
+      config !== null && config.path !== ''
+        ? t('balance.current', { path: config.path, field: config.field })
+        : t('balance.currentEmpty')
+    )
+  );
 }
 
 /**
