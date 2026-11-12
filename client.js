@@ -3185,9 +3185,7 @@ const WHALE_CORNER_CSS = `
     right: 20px;
     bottom: 20px;
     z-index: 1000;
-    display: flex;
-    align-items: flex-end;
-    gap: 12px;
+    width: 116px;
     pointer-events: auto;
     font-family: inherit;
     color: var(--dsw-alias-label-primary);
@@ -3208,22 +3206,24 @@ const WHALE_CORNER_CSS = `
   }
   .dsu-whale-q {
     position: absolute;
-    right: -6px;
-    top: -8px;
-    width: 26px;
-    height: 26px;
+    left: -9px;
+    top: -11px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     background: var(--dsw-alias-state-business-primary);
     color: #fff;
-    font: 700 16px/26px Georgia, "Times New Roman", serif;
+    font: 700 15px/24px Georgia, "Times New Roman", serif;
     text-align: center;
     box-shadow: 0 2px 8px rgba(15, 17, 21, .28);
   }
-  /* The bubble clears the mascot to its upper right. */
+  /* The bubble rests on the mascot's head, offset to the upper left. */
   .dsu-whale-bubble {
-    position: relative;
-    width: 128px;
-    margin-bottom: 84px;
+    position: absolute;
+    left: -22px;
+    bottom: 104px;
+    box-sizing: border-box;
+    width: 132px;
     padding: 8px 11px 9px;
     border: 1px solid var(--dsw-alias-border-l2);
     border-radius: 14px;
@@ -3232,7 +3232,7 @@ const WHALE_CORNER_CSS = `
   }
   .dsu-whale-tail {
     position: absolute;
-    left: 26px;
+    right: 34px;
     bottom: -6px;
     width: 11px;
     height: 11px;
@@ -3280,8 +3280,9 @@ const WHALE_CORNER_CSS = `
   }
   .dsu-whale-row.is-pending strong { color: var(--dsw-alias-label-secondary); }
   @media (max-width: 640px) {
+    .dsu-whale { width: 84px; }
     .dsu-whale-art, .dsu-whale-img { width: 84px; }
-    .dsu-whale-bubble { width: 118px; padding: 7px 10px 8px; margin-bottom: 60px; }
+    .dsu-whale-bubble { width: 118px; padding: 7px 10px 8px; left: -18px; bottom: 74px; }
     .dsu-whale-remain { font-size: 16px; }
   }
 `;
@@ -3591,10 +3592,10 @@ function WhaleCorner(props) {
         src: WHALE_FRAMES[frame],
         alt: '',
         'aria-hidden': 'true'
-      }),
-      h('span', { className: 'dsu-whale-q', 'aria-hidden': 'true' }, '?')
+      })
     ),
     h('div', { className: 'dsu-whale-bubble' },
+      h('span', { className: 'dsu-whale-q', 'aria-hidden': 'true' }, '?'),
       h('div', { className: 'dsu-whale-tail', 'aria-hidden': 'true' }),
       h('div', { className: 'dsu-whale-line1' },
         h('span', {
