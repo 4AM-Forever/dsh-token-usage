@@ -3221,10 +3221,10 @@ const WHALE_CORNER_CSS = `
   .dsu-whale-bubble {
     position: absolute;
     left: -34px;
-    bottom: 104px;
+    bottom: 118px;
     box-sizing: border-box;
-    width: 132px;
-    padding: 8px 11px 9px;
+    width: 140px;
+    padding: 9px 11px 10px;
     border: 1px solid var(--dsw-alias-border-l2);
     border-radius: 14px;
     background: var(--dsw-alias-bg-layer-1);
@@ -3247,9 +3247,10 @@ const WHALE_CORNER_CSS = `
      one edge and every label starts on another. */
   .dsu-whale-grid {
     display: grid;
-    grid-template-columns: 1fr max-content;
+    grid-template-columns: max-content max-content;
+    justify-content: center;
     align-items: baseline;
-    column-gap: 11px;
+    column-gap: 10px;
     row-gap: 3px;
   }
   .dsu-whale-divider {
@@ -3259,7 +3260,7 @@ const WHALE_CORNER_CSS = `
     background: var(--dsw-alias-border-l1);
   }
   .dsu-whale-hero-value {
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: -.03em;
@@ -3293,7 +3294,7 @@ const WHALE_CORNER_CSS = `
   @media (max-width: 640px) {
     .dsu-whale { width: 84px; }
     .dsu-whale-art, .dsu-whale-img { width: 84px; }
-    .dsu-whale-bubble { width: 122px; padding: 7px 10px 8px; left: -30px; bottom: 74px; }
+    .dsu-whale-bubble { width: 132px; padding: 8px 10px 9px; left: -30px; bottom: 88px; }
     .dsu-whale-hero-value { font-size: 17px; }
     .dsu-whale-value { font-size: 11px; }
   }
