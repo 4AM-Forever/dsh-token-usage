@@ -64,7 +64,6 @@ window.__ModuleLoader__.load({
       'whale.remaining': 'Left',
       'whale.todayCost': 'Spent today',
       'whale.todayTokens': 'Tokens today',
-      'whale.editHint': 'Click to set the budget',
       'billing.title': 'Account-wide usage',
       'billing.subtitle': 'Account-wide token and billed usage, including calls outside this profile.',
       'billing.loading': 'Loading account spend…',
@@ -173,7 +172,6 @@ window.__ModuleLoader__.load({
       'whale.remaining': '剩余',
       'whale.todayCost': '今日花费',
       'whale.todayTokens': '今日消耗',
-      'whale.editHint': '点击可设置额度',
       'billing.title': '平台账户用量',
       'billing.subtitle': '账户全量的 Token 与计费用量，包含 DSH 之外的调用。',
       'billing.loading': '正在读取账户费用…',
@@ -3055,10 +3053,10 @@ window.__ModuleLoader__.load({
 /**
  * Bottom-right whale companion: a rotating mascot beside a small readout.
  *
- * Every frame of the readout reads today's account usage from the shared
- * store, so the figure always matches the sidebar badge. "Remaining" is a
- * local budget the user can edit by clicking the number; it is not a
- * Platform balance, because the Platform exposes no balance endpoint.
+ * "Remaining" is read from the Platform's own balance endpoint through the
+ * Host bridge, so it is never a locally invented number. Today's spend and
+ * token total come from the shared usage store's today window, which keeps
+ * them identical to the sidebar badge.
  */
 
 /** Two mascot frames, each a transparent WebP encoded inline. */
@@ -3070,9 +3068,6 @@ const WHALE_FRAMES = [
 /** Rotate the mascot on this cadence. */
 const WHALE_FRAME_MS = 4000;
 
-/** Local budget storage key and fallback. */
-const BUDGET_KEY = 'dsh-token-usage:budget';
-const BUDGET_DEFAULT = 100;
 
 /** Styles for the corner widget; scoped under its own class names. */
 const WHALE_CORNER_CSS = `
@@ -3081,17 +3076,14 @@ const WHALE_CORNER_CSS = `
     right: 20px;
     bottom: 20px;
     z-index: 1000;
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
+    width: 116px;
     pointer-events: auto;
     font-family: inherit;
     color: var(--dsw-alias-label-primary);
   }
   .dsu-whale-art {
     position: relative;
-    flex: none;
-    cursor: pointer;
+    width: 116px;
     user-select: none;
   }
   .dsu-whale-img {
@@ -3115,124 +3107,121 @@ const WHALE_CORNER_CSS = `
     text-align: center;
     box-shadow: 0 2px 8px rgba(15, 17, 21, .28);
   }
+  /* The bubble sits above the mascot's head, to its left. */
   .dsu-whale-bubble {
-    position: relative;
-    min-width: 186px;
-    margin-bottom: 14px;
-    padding: 10px 15px 11px;
+    position: absolute;
+    right: calc(100% + 10px);
+    bottom: 74px;
+    width: 128px;
+    padding: 8px 11px 9px;
     border: 1px solid var(--dsw-alias-border-l2);
-    border-radius: 15px;
+    border-radius: 14px;
     background: var(--dsw-alias-bg-layer-1);
     box-shadow: 0 8px 24px rgba(15, 17, 21, .16);
   }
   .dsu-whale-tail {
     position: absolute;
-    left: -6px;
-    bottom: 16px;
+    right: -6px;
+    bottom: 10px;
     width: 11px;
     height: 11px;
-    border-left: 1px solid var(--dsw-alias-border-l2);
+    border-right: 1px solid var(--dsw-alias-border-l2);
     border-bottom: 1px solid var(--dsw-alias-border-l2);
-    border-radius: 0 0 0 3px;
+    border-radius: 0 0 3px 0;
     background: var(--dsw-alias-bg-layer-1);
-    transform: rotate(45deg);
+    transform: rotate(-45deg);
   }
   .dsu-whale-line1 {
     display: flex;
     align-items: baseline;
-    gap: 7px;
+    gap: 5px;
   }
   .dsu-whale-key {
     color: var(--dsw-alias-label-secondary);
-    font-size: 10.5px;
+    font-size: 10px;
     white-space: nowrap;
   }
   .dsu-whale-remain {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: -.02em;
     line-height: 1.15;
-    cursor: text;
-    border-bottom: 1px dashed transparent;
+    white-space: nowrap;
   }
   .dsu-whale-remain.is-negative {
     color: var(--dsw-alias-state-error-primary);
   }
-  .dsu-whale-remain.is-editable {
-    border-bottom-color: var(--dsw-alias-border-l2);
-  }
-  .dsu-whale-input {
-    width: 96px;
-    padding: 0 4px;
-    border: 1px solid var(--dsw-alias-border-l2);
-    border-radius: 6px;
-    background: var(--dsw-alias-bg-base);
-    color: var(--dsw-alias-label-primary);
-    font: inherit;
-    font-size: 16px;
-    font-weight: 700;
-    outline: none;
-  }
   .dsu-whale-row {
     display: flex;
-    justify-content: space-between;
-    gap: 18px;
-    margin-top: 4px;
+    align-items: baseline;
+    gap: 5px;
+    margin-top: 3px;
     color: var(--dsw-alias-label-secondary);
-    font-size: 11px;
+    font-size: 10px;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   .dsu-whale-row strong {
     color: var(--dsw-alias-label-primary);
+    font-size: 11px;
     font-weight: 600;
   }
   .dsu-whale-row.is-pending strong { color: var(--dsw-alias-label-secondary); }
   @media (max-width: 640px) {
-    .dsu-whale-img { width: 84px; }
-    .dsu-whale-bubble { min-width: 150px; padding: 8px 12px 9px; }
-    .dsu-whale-remain { font-size: 17px; }
+    .dsu-whale, .dsu-whale-art, .dsu-whale-img { width: 84px; }
+    .dsu-whale-bubble { width: 118px; padding: 7px 10px 8px; bottom: 58px; }
+    .dsu-whale-remain { font-size: 16px; }
   }
 `;
 
 /**
- * Read the locally stored budget.
- * @returns the amount, or the default when absent or invalid.
+ * Ask the Host for the signed-in account's remaining balance.
+ * @returns the balance record.
+ * @throws when the route reports a failure or an unusable amount.
  */
-function readBudget() {
+async function fetchBalance() {
+  const response = await fetch(BILLING_ROUTE, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'content-type': 'application/json',
+      'x-dsh-usage-client': '1'
+    },
+    body: JSON.stringify({
+      action: 'balance',
+      tz: -new Date().getTimezoneOffset() * 60
+    })
+  });
+  let payload = null;
   try {
-    const raw = window.localStorage.getItem(BUDGET_KEY);
-    const value = raw === null ? Number.NaN : Number.parseFloat(raw);
-    return Number.isFinite(value) && value >= 0 ? value : BUDGET_DEFAULT;
+    payload = await response.json();
   } catch (_error) {
-    return BUDGET_DEFAULT;
+    payload = null;
   }
-}
-
-/**
- * Persist the budget for the next page load.
- * @param value - non-negative amount.
- */
-function writeBudget(value) {
-  try {
-    window.localStorage.setItem(BUDGET_KEY, String(value));
-  } catch (_error) {
-    // A blocked storage area only costs persistence, not the reading.
+  if (payload === null || typeof payload !== 'object' || payload.ok !== true) {
+    throw new Error('balance-unavailable');
   }
+  const total = payload.data === undefined ? Number.NaN : payload.data.total;
+  if (!(typeof total === 'number' && Number.isFinite(total))) {
+    throw new Error('balance-unavailable');
+  }
+  return {
+    total,
+    currency: typeof payload.data.currency === 'string' ? payload.data.currency : ''
+  };
 }
 
 /**
  * The corner companion itself.
- * @param props - unused; the widget reads shared state directly.
+ * @param props - carries the bound translate function.
  * @returns the widget element.
  */
 function WhaleCorner(props) {
   const t = typeof props.translate === 'function' ? props.translate : (key) => key;
   const [frame, setFrame] = React.useState(0);
   const [today, setToday] = React.useState(null);
-  const [budget, setBudget] = React.useState(readBudget);
-  const [editing, setEditing] = React.useState(false);
-  const [draft, setDraft] = React.useState('');
+  const [balance, setBalance] = React.useState(null);
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
@@ -3274,22 +3263,30 @@ function WhaleCorner(props) {
     };
   }, []);
 
-  const startEdit = () => {
-    setDraft(String(budget));
-    setEditing(true);
-  };
-  const commitEdit = () => {
-    const value = Number.parseFloat(draft);
-    if (Number.isFinite(value) && value >= 0) {
-      setBudget(value);
-      writeBudget(value);
-    }
-    setEditing(false);
-  };
+  React.useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const value = await fetchBalance();
+        if (active) setBalance(value);
+      } catch (_error) {
+        if (active) setBalance(null);
+      }
+    };
+    load();
+    const timer = window.setInterval(load, 60000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const spent = today === null ? null : today.cost;
-  const remaining = spent === null ? null : budget - spent;
-  const money = (value) => formatMoney(value, today === null ? '' : today.currency);
+  const remaining = balance === null ? null : balance.total;
+  const currency = balance !== null && balance.currency !== ''
+    ? balance.currency
+    : (today === null ? '' : today.currency);
+  const money = (value) => formatMoney(value, currency);
 
   return h('div', { className: 'dsu-whale' },
     h('style', null, WHALE_CORNER_CSS),
@@ -3305,40 +3302,18 @@ function WhaleCorner(props) {
     h('div', { className: 'dsu-whale-bubble' },
       h('div', { className: 'dsu-whale-tail', 'aria-hidden': 'true' }),
       h('div', { className: 'dsu-whale-line1' },
-        h('span', { className: 'dsu-whale-key' }, t('whale.remaining')),
-        editing
-          ? h('input', {
-            className: 'dsu-whale-input',
-            type: 'number',
-            min: 0,
-            step: 10,
-            value: draft,
-            autoFocus: true,
-            onChange: (event) => setDraft(event.target.value),
-            onBlur: commitEdit,
-            onKeyDown: (event) => {
-              if (event.key === 'Enter') commitEdit();
-              if (event.key === 'Escape') setEditing(false);
-            }
-          })
-          : h('span', {
-            className: `dsu-whale-remain is-editable${remaining !== null && remaining < 0 ? ' is-negative' : ''}`,
-            role: 'button',
-            tabIndex: 0,
-            title: t('whale.editHint'),
-            onClick: startEdit,
-            onKeyDown: (event) => {
-              if (event.key === 'Enter' || event.key === ' ') startEdit();
-            }
-          }, remaining === null ? '—' : money(remaining))
+        h('span', {
+          className: `dsu-whale-remain${remaining !== null && remaining < 0 ? ' is-negative' : ''}`
+        }, remaining === null ? '—' : money(remaining)),
+        h('span', { className: 'dsu-whale-key' }, t('whale.remaining'))
       ),
       h('div', { className: `dsu-whale-row${spent === null ? ' is-pending' : ''}` },
-        h('span', null, t('whale.todayCost')),
-        h('strong', null, spent === null ? '—' : money(spent))
+        h('strong', null, spent === null ? '—' : money(spent)),
+        h('span', null, t('whale.todayCost'))
       ),
       h('div', { className: `dsu-whale-row${today === null ? ' is-pending' : ''}` },
-        h('span', null, t('whale.todayTokens')),
-        h('strong', null, today === null ? '—' : formatTokens(today.tokens, 'wan'))
+        h('strong', null, today === null ? '—' : formatTokens(today.tokens, 'wan')),
+        h('span', null, t('whale.todayTokens'))
       )
     )
   );

@@ -400,9 +400,95 @@ async function usageUrl(ctx) {
 }
 
 /**
+ * Read a finite non-negative number, allowing zero, and distinguishing
+ * "absent" from "zero".
+ * @param value - number or numeric string.
+ * @returns the value, or undefined when it is not a usable amount.
+ */
+function amountOrUndefined(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value >= 0 ? value : undefined;
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Extract the account balance from one Platform payload.
+ *
+ * The private endpoint is undocumented and has appeared in more than one
+ * shape, so every known spelling is tried before giving up.
+ * @param payload - parsed Platform JSON.
+ * @returns the balance record, or undefined when nothing usable was present.
+ */
+function parseBalance(payload) {
+  const root = payload?.data?.biz_data ?? payload?.data ?? {};
+  const infos = root?.balance_infos ?? root?.balanceInfos ?? root?.balances;
+  if (Array.isArray(infos) && infos.length > 0) {
+    const cny = infos.find((info) => String(info?.currency ?? '').toUpperCase() === 'CNY');
+    const info = cny ?? infos[0];
+    const total = amountOrUndefined(
+      info?.total_balance ?? info?.totalBalance ?? info?.balance ?? info?.amount
+    );
+    if (total !== undefined) {
+      return {
+        currency: String(info?.currency ?? ''),
+        total,
+        granted: amountOrUndefined(info?.granted_balance ?? info?.grantedBalance) ?? 0,
+        toppedUp: amountOrUndefined(info?.topped_up_balance ?? info?.toppedUpBalance) ?? 0
+      };
+    }
+  }
+  const direct = amountOrUndefined(
+    root?.balance ?? root?.total_balance ?? root?.totalBalance ?? root?.remaining ?? root?.remain
+  );
+  if (direct !== undefined) {
+    return {
+      currency: String(root?.currency ?? ''),
+      total: direct,
+      granted: 0,
+      toppedUp: 0
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Ask the Platform for the signed-in account's remaining balance.
+ *
+ * Several path and header spellings are attempted because the endpoint is
+ * private and has moved before; the first usable answer wins.
+ * @param session - Host-only Platform session.
+ * @param tzSec - local UTC offset in seconds.
+ * @returns the balance record.
+ * @throws BillingError when no candidate answers.
+ */
+async function fetchBalance(session, tzSec) {
+  const paths = ['/api/v0/users/balance', '/api/v0/user/balance', '/api/v0/user/info'];
+  const modes = ['both', 'dsh', 'bearer'];
+  let lastError;
+  for (const mode of modes) {
+    for (const path of paths) {
+      try {
+        const payload = await platformGet(session, path, new URLSearchParams(), mode, tzSec);
+        const parsed = parseBalance(payload);
+        if (parsed !== undefined) return parsed;
+      } catch (error) {
+        lastError = error;
+        if (!(error instanceof BillingError)) throw error;
+      }
+    }
+  }
+  throw lastError ?? new BillingError('balance-unavailable');
+}
+
+/**
  * Handle one billing action after the route admitted the caller.
  * @param ctx - Host context.
- * @param action - `status` or `usage`.
+ * @param action - `status`, `usage`, or `balance`.
  * @param body - parsed request body.
  * @returns response payload.
  */
@@ -419,6 +505,30 @@ async function handleBilling(ctx, action, body) {
     return {
       ok: true,
       signedIn: session !== null,
+      usageUrl: url
+    };
+  }
+  if (action === 'balance') {
+    let session = null;
+    try {
+      session = account === undefined ? null : await account.getPlatformSession();
+    } catch (_error) {
+      session = null;
+    }
+    if (session === null) {
+      return {
+        ok: false,
+        code: 'not-signed-in',
+        usageUrl: url
+      };
+    }
+    const tzValue = Number(body.tz);
+    const tzSec = Number.isInteger(tzValue) && tzValue >= -14 * 60 * 60 && tzValue <= 14 * 60 * 60
+      ? tzValue
+      : -new Date().getTimezoneOffset() * 60;
+    return {
+      ok: true,
+      data: await fetchBalance(session, tzSec),
       usageUrl: url
     };
   }
